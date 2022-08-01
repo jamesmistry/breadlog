@@ -9,7 +9,7 @@ jobs:
     - name: Setup | Checkout
       uses: actions/checkout@v3
     - name: Setup | Prerequisites
-      run: "apt update && apt install curl"
+      run: "sudo bash -c 'apt update && apt install curl'"
     - name: Setup | Rust
       run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
     - name: Setup | Rust Nightly
@@ -30,7 +30,7 @@ jobs:
     - name: Setup | Checkout
       uses: actions/checkout@v3
     - name: Setup | Prerequisites
-      run: "apt update && apt install curl"
+      run: "sudo bash -c 'apt update && apt install curl'"
     - name: Setup | Rust
       run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
     - name: Setup | Rust Nightly
