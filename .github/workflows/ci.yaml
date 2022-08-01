@@ -9,9 +9,9 @@ jobs:
     - name: Setup | Checkout
       uses: actions/checkout@v3
     - name: Setup | Prerequisites
-      run: "sudo bash -c 'apt update && apt install curl'"
+      run: "sudo bash -c 'apt update && DEBIAN_FRONTEND=noninteractive apt install -y curl'"
     - name: Setup | Rust
-      run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+      run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
     - name: Setup | Rust Nightly
       run: "rustup install nightly"
     - name: Setup | Code Formatter
@@ -30,9 +30,9 @@ jobs:
     - name: Setup | Checkout
       uses: actions/checkout@v3
     - name: Setup | Prerequisites
-      run: "sudo bash -c 'apt update && apt install curl'"
+      run: "sudo bash -c 'apt update && DEBIAN_FRONTEND=noninteractive apt install -y curl'"
     - name: Setup | Rust
-      run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+      run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
     - name: Setup | Rust Nightly
       run: "rustup install nightly"
     - name: Setup | LLVM Tooling
