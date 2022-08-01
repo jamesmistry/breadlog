@@ -1,0 +1,53 @@
+---
+name: ci
+on: [push]
+jobs:
+  static-analysis:
+    name: Run static analysis
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup | Checkout
+      uses: actions/checkout@v3
+    - name: Setup | Prerequisites
+      run: "apt update && apt install curl"
+    - name: Setup | Rust
+      run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+    - name: Setup | Rust Nightly
+      run: "rustup install nightly"
+    - name: Setup | Code Formatter
+      run: "rustup update && rustup component add rustfmt"
+    - name: Setup | Linter
+      run: "rustup update && rustup component add clippy"
+    - name: Code Format Check | App
+      run: "cargo +nightly fmt -- --check --config-path src/"
+    - name: Lint | App
+      run: "cargo clippy -- -D warnings"
+
+  build:
+    name: Build and run small tests
+    runs-on: ubuntu-latest
+    steps:
+    - name: Setup | Checkout
+      uses: actions/checkout@v3
+    - name: Setup | Prerequisites
+      run: "apt update && apt install curl"
+    - name: Setup | Rust
+      run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh"
+    - name: Setup | Rust Nightly
+      run: "rustup install nightly"
+    - name: Setup | LLVM Tooling
+      run: "rustup component add llvm-tools-preview"
+    - name: Build | App
+      run: "cargo build && cargo build --release"
+    - name: Small tests | App
+      run: "RUST_BACKTRACE=1 cargo test"
+    - name: Cache debug output | App
+      uses: actions/cache@v3
+      with:
+        path: target/debug/breadlog
+        key: target-debug-breadlog
+    - name: Cache release output | App
+      uses: actions/cache@v3
+      with:
+        path: target/release/breadlog
+        key: target-release-breadlog
