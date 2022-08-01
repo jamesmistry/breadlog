@@ -5,7 +5,6 @@ jobs:
   static-analysis:
     name: Run static analysis
     runs-on: ubuntu-latest
-    concurrency: build-${{ github.ref }}
     steps:
     - name: Setup | Checkout
       uses: actions/checkout@v3
@@ -25,9 +24,9 @@ jobs:
       run: "cargo clippy -- -D warnings"
 
   build:
+    needs: static-analysis
     name: Build and run small tests
     runs-on: ubuntu-latest
-    concurrency: build-${{ github.ref }}
     steps:
     - name: Setup | Checkout
       uses: actions/checkout@v3
