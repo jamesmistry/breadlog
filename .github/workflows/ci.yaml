@@ -38,17 +38,26 @@ jobs:
       run: "rustup install nightly"
     - name: Setup | LLVM Tooling
       run: "rustup component add llvm-tools-preview"
-    - name: Build | App
-      run: "cargo build && cargo build --release"
+    - name: Setup | LLVM helper
+      run: "cargo install cargo-binutils && rustup component add llvm-tools-preview"
+    - name: Build | App - Release
+      run: "cargo build --release"
+    - name: Build | App - Debug
+      run: "LLVM_PROFILE_FILE='profiler_output.profraw' RUSTFLAGS='-C instrument-coverage' cargo build"
     - name: Small tests | App
-      run: "RUST_BACKTRACE=1 cargo test"
+      run: './.github/workflows/test_with_coverage.bash "$(pwd)" &> ./small_test_coverage_report.txt && cat ./small_test_coverage_report.txt'
+    - name: Cache code coverage report | App
+      uses: actions/cache@v3
+      with:
+        path: small_test_coverage_report.txt
+        key: small_test_coverage_report-${{ github.ref }}
     - name: Cache debug output | App
       uses: actions/cache@v3
       with:
-        path: target/debug/breadlog-${{ github.ref }}
-        key: target-debug-breadlog
+        path: target/debug/breadlog
+        key: target-debug-breadlog-${{ github.ref }}
     - name: Cache release output | App
       uses: actions/cache@v3
       with:
-        path: target/release/breadlog-${{ github.ref }}
-        key: target-release-breadlog
+        path: target/release/breadlog
+        key: target-release-breadlog-${{ github.ref }}
