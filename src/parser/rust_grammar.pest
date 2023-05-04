@@ -1,0 +1,16 @@
+// Set up implicit rules for ignoring whitespace and comments.
+
+WHITESPACE = _{ "\t" | "\n" | "\u{000B}" | "\u{000C}" | "\r" | " " | "\u{0085}" | "\u{200E}" | "\u{200F}" | "\u{2028}" | "\u{2029}" }
+COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ ANY* ~ ("\n" | EOI)) }
+
+string_value = @{ (!(!"\\"{1} ~ "\"") ~ ANY)* }
+string_literal = { "\"" ~ string_value ~ (!"\\"{1} ~ "\"") }
+string_arg = { "(" ~ string_literal }
+macro_name = { ((XID_START | "_") ~ (XID_CONTINUE ~ "::"?)*) }
+log_macro = { macro_name ~ "!" ~ string_arg }
+file =
+{ 
+    SOI ~
+    (log_macro | ANY)* ~
+    EOI
+}
