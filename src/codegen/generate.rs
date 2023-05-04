@@ -1,8 +1,8 @@
 use async_std::task;
 
 use super::CodeFinder;
-use crate::parser;
 use crate::config::Context;
+use crate::parser;
 use log::error;
 
 const START_REFERENCE_ID: u32 = 1;
@@ -14,8 +14,7 @@ pub trait ReferenceProcessor<ReduceResult>
     fn reduce(map_result: &Vec<MapResult>) -> Option<ReduceResult>;
 }
 
-struct NextReferenceId
-{}
+struct NextReferenceId {}
 
 impl ReferenceProcessor<u32> for NextReferenceId
 {
@@ -56,7 +55,7 @@ impl ReferenceProcessor<u32> for NextReferenceId
         {
             return Some(START_REFERENCE_ID);
         }
-        
+
         Some(reduce_result + 1)
     }
 }
@@ -70,19 +69,21 @@ async fn load_code(path: &String) -> Option<String>
         {
             error!("Failed to read file {}: {}", path, e);
             return None;
-        }
+        },
     };
 }
 
-fn process_references<'generator, ProcessorType, ReduceResult>(context: &'generator Context, finder: &'generator CodeFinder) -> Option<ReduceResult>
+fn process_references<'generator, ProcessorType, ReduceResult>(
+    context: &'generator Context,
+    finder: &'generator CodeFinder,
+) -> Option<ReduceResult>
 where
-    ProcessorType: ReferenceProcessor<ReduceResult>
+    ProcessorType: ReferenceProcessor<ReduceResult>,
 {
     let config_task_outer = context.config.clone();
     let stop_flag = context.stop_commanded.clone();
-        
-    return task::block_on(async
-    {
+
+    return task::block_on(async {
         let mut all_map_results = Vec::new();
 
         for file in finder.code_files.iter()
@@ -99,13 +100,18 @@ where
             if let Some(map_result) = async_std::task::spawn(async move {
                 if let Some(file_contents) = load_code(&path).await
                 {
-                    let references = parser::code_parser::find_references(language, &file_contents, &config_task_inner);
+                    let references = parser::code_parser::find_references(
+                        language,
+                        &file_contents,
+                        &config_task_inner,
+                    );
 
                     return ProcessorType::map(&path, &references);
                 }
 
                 None
-            }).await
+            })
+            .await
             {
                 all_map_results.push(map_result);
             }
@@ -118,14 +124,14 @@ where
 
         ProcessorType::reduce(&all_map_results)
     });
-
 }
 
 pub fn generate_code<'generator>(context: &'generator Context) -> Result<u32, &'static str>
 {
     if let Some(finder) = CodeFinder::new(context)
     {
-        let next_reference_id = process_references::<NextReferenceId, u32>(context, &finder).map_or(START_REFERENCE_ID, |id| { id });
+        let next_reference_id = process_references::<NextReferenceId, u32>(context, &finder)
+            .map_or(START_REFERENCE_ID, |id| id);
     }
     else
     {
@@ -138,17 +144,16 @@ pub fn generate_code<'generator>(context: &'generator Context) -> Result<u32, &'
 #[cfg(test)]
 mod tests
 {
-    use std::str::FromStr;
+    use super::*;
+    use crate::codegen::CodeFile;
     use crate::config::Context;
     use crate::parser::code_parser::CodeLanguage;
-    use crate::codegen::CodeFile;
-    use tempdir::TempDir;
     use std::fs::File;
     use std::io::Write;
-    use super::*;
+    use std::str::FromStr;
+    use tempdir::TempDir;
 
-    struct TestRefProcCount
-    {}
+    struct TestRefProcCount {}
 
     impl ReferenceProcessor<u32> for TestRefProcCount
     {
@@ -175,7 +180,7 @@ mod tests
             {
                 return None;
             }
-            
+
             Some(reduce_result)
         }
     }
@@ -183,15 +188,19 @@ mod tests
     fn create_test_context(source_dir: &String, check_mode: bool) -> Context
     {
         let context = Context::new(
-            format!(r#"
+            format!(
+                r#"
 source_dir: {}
 rust:
   log_macros:
     - module: test_module
       name: test_macro
-"#, source_dir)
+"#,
+                source_dir
+            )
             .to_string(),
-        check_mode,)
+            check_mode,
+        )
         .unwrap();
 
         context
@@ -203,7 +212,10 @@ rust:
         const TEST_PATH: &str = "test.rs";
         let test_input: Vec<parser::LogRefEntry> = Vec::new();
 
-        assert_eq!(NextReferenceId::map(&String::from(TEST_PATH), &test_input), None);
+        assert_eq!(
+            NextReferenceId::map(&String::from(TEST_PATH), &test_input),
+            None
+        );
     }
 
     #[test]
@@ -224,7 +236,10 @@ rust:
             test_input.push(entry);
         }
 
-        assert_eq!(NextReferenceId::map(&String::from(TEST_PATH), &test_input), None);
+        assert_eq!(
+            NextReferenceId::map(&String::from(TEST_PATH), &test_input),
+            None
+        );
     }
 
     #[test]
@@ -235,23 +250,29 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 1, 1);
-            let entry = parser::LogRefEntry::new(code_pos, Some(1), String::from_str("test").unwrap());
+            let entry =
+                parser::LogRefEntry::new(code_pos, Some(1), String::from_str("test").unwrap());
             test_input.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry = parser::LogRefEntry::new(code_pos, Some(3), String::from_str("test").unwrap());
+            let entry =
+                parser::LogRefEntry::new(code_pos, Some(3), String::from_str("test").unwrap());
             test_input.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry = parser::LogRefEntry::new(code_pos, Some(8), String::from_str("test").unwrap());
+            let entry =
+                parser::LogRefEntry::new(code_pos, Some(8), String::from_str("test").unwrap());
             test_input.push(entry);
         }
 
-        assert_eq!(NextReferenceId::map(&String::from(TEST_PATH), &test_input), Some(8));
+        assert_eq!(
+            NextReferenceId::map(&String::from(TEST_PATH), &test_input),
+            Some(8)
+        );
     }
 
     #[test]
@@ -288,7 +309,8 @@ rust:
     fn test_process_no_results()
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
-        let test_context = create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
 
         {
             let source_file_path = temp_dir
@@ -316,14 +338,18 @@ rust:
 
         let test_finder = CodeFinder::new(&test_context).unwrap();
 
-        assert_eq!(process_references::<TestRefProcCount, u32>(&test_context, &test_finder), None);
+        assert_eq!(
+            process_references::<TestRefProcCount, u32>(&test_context, &test_finder),
+            None
+        );
     }
 
     #[test]
     fn test_process_results()
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
-        let test_context = create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
 
         {
             let source_file_path = temp_dir
@@ -334,11 +360,15 @@ rust:
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test1() {
     test_macro!("Log test.");
 }
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         {
@@ -350,23 +380,31 @@ fn test1() {
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test2() {
     test_macro!("Log test.");
 }
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         let test_finder = CodeFinder::new(&test_context).unwrap();
 
-        assert_eq!(process_references::<TestRefProcCount, u32>(&test_context, &test_finder), Some(2));
+        assert_eq!(
+            process_references::<TestRefProcCount, u32>(&test_context, &test_finder),
+            Some(2)
+        );
     }
 
     #[test]
     fn test_process_partial_results()
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
-        let test_context = create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
 
         {
             let source_file_path = temp_dir
@@ -377,9 +415,13 @@ fn test2() {
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test1() {}
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         {
@@ -391,16 +433,23 @@ fn test1() {}
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test2() {
     test_macro!("Log test.");
 }
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         let test_finder = CodeFinder::new(&test_context).unwrap();
 
-        assert_eq!(process_references::<TestRefProcCount, u32>(&test_context, &test_finder), Some(1));
+        assert_eq!(
+            process_references::<TestRefProcCount, u32>(&test_context, &test_finder),
+            Some(1)
+        );
     }
 
     #[test]
@@ -409,7 +458,8 @@ fn test2() {
         use std::sync::atomic::Ordering;
 
         let temp_dir = TempDir::new("breadlog_test").unwrap();
-        let test_context = create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
 
         {
             let source_file_path = temp_dir
@@ -420,11 +470,15 @@ fn test2() {
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test1() {
     test_macro!("Log test.");
 }
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         {
@@ -436,25 +490,35 @@ fn test1() {
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test2() {
     test_macro!("Log test.");
 }
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         let test_finder = CodeFinder::new(&test_context).unwrap();
 
-        test_context.stop_commanded.fetch_or(true, Ordering::Relaxed);
+        test_context
+            .stop_commanded
+            .fetch_or(true, Ordering::Relaxed);
 
-        assert_eq!(process_references::<TestRefProcCount, u32>(&test_context, &test_finder), None);
+        assert_eq!(
+            process_references::<TestRefProcCount, u32>(&test_context, &test_finder),
+            None
+        );
     }
 
     #[test]
     fn test_process_next_reference_id()
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
-        let test_context = create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
 
         {
             let source_file_path = temp_dir
@@ -465,11 +529,15 @@ fn test2() {
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test1() {
     test_macro!("[ref: 9] Log test.");
 }
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         {
@@ -481,15 +549,22 @@ fn test1() {
                 .to_string();
 
             let mut source_file = File::create(&source_file_path).unwrap();
-            source_file.write_all(br#"
+            source_file
+                .write_all(
+                    br#"
 fn test2() {
     test_macro!("[ref: 10] Log test.");
 }
-            "#).unwrap();
+            "#,
+                )
+                .unwrap();
         }
 
         let test_finder = CodeFinder::new(&test_context).unwrap();
 
-        assert_eq!(process_references::<NextReferenceId, u32>(&test_context, &test_finder), Some(11));
+        assert_eq!(
+            process_references::<NextReferenceId, u32>(&test_context, &test_finder),
+            Some(11)
+        );
     }
 }

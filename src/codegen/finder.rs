@@ -2,10 +2,10 @@ use std::option::Option;
 
 use crate::config::Context;
 
-use log::{error, warn};
-use std::{fs::metadata};
-use walkdir::WalkDir;
 use crate::parser::code_parser::CodeLanguage;
+use log::{error, warn};
+use std::fs::metadata;
+use walkdir::WalkDir;
 
 pub struct CodeFile
 {
@@ -17,11 +17,7 @@ impl CodeFile
 {
     pub fn new(path: String, language: CodeLanguage) -> CodeFile
     {
-        Self 
-        { 
-            path,
-            language,
-        }
+        Self { path, language }
     }
 }
 
@@ -33,10 +29,9 @@ pub struct CodeFinder<'ctx>
 
 impl<'ctx> CodeFinder<'ctx>
 {
-    pub fn new(context: &'ctx Context) -> Option<CodeFinder<'ctx> >
+    pub fn new(context: &'ctx Context) -> Option<CodeFinder<'ctx>>
     {
-        let mut result = Self
-        {
+        let mut result = Self {
             code_files: Vec::new(),
             context,
         };
@@ -118,7 +113,8 @@ impl<'ctx> CodeFinder<'ctx>
                         None => continue,
                     };
 
-                    self.code_files.push(CodeFile::new(path_str, CodeLanguage::Rust));
+                    self.code_files
+                        .push(CodeFile::new(path_str, CodeLanguage::Rust));
                 }
             }
         }
@@ -154,7 +150,7 @@ rust:
         Context::new(test_config, false).unwrap()
     }
 
-    fn search_codefile(needle: &String, haystack: & Vec<CodeFile>) -> bool
+    fn search_codefile(needle: &String, haystack: &Vec<CodeFile>) -> bool
     {
         for code_file in haystack
         {
@@ -347,7 +343,7 @@ rust:
         context.config.rust.extensions.push("rs".to_string());
 
         let finder = CodeFinder::new(&context).unwrap();
-        
+
         assert_eq!(finder.code_files.len(), 2);
 
         assert!(search_codefile(
@@ -357,7 +353,8 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-            &finder.code_files));
+            &finder.code_files
+        ));
 
         assert!(search_codefile(
             &temp_dir
@@ -366,7 +363,8 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-                &finder.code_files));
+            &finder.code_files
+        ));
 
         assert_eq!(finder.code_files[0].language, CodeLanguage::Rust);
         assert_eq!(finder.code_files[1].language, CodeLanguage::Rust);
@@ -435,7 +433,8 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-                &finder.code_files));
+            &finder.code_files
+        ));
 
         assert!(search_codefile(
             &temp_dir
@@ -445,7 +444,8 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-                &finder.code_files));
+            &finder.code_files
+        ));
 
         assert_eq!(finder.code_files[0].language, CodeLanguage::Rust);
         assert_eq!(finder.code_files[1].language, CodeLanguage::Rust);
@@ -535,7 +535,8 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-                &finder.code_files));
+            &finder.code_files
+        ));
         assert!(search_codefile(
             &temp_dir
                 .path()
@@ -543,10 +544,11 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-                &finder.code_files));
+            &finder.code_files
+        ));
 
         assert!(finder.find());
-        
+
         assert_eq!(finder.code_files.len(), 2);
 
         assert!(search_codefile(
@@ -556,7 +558,8 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-                &finder.code_files));
+            &finder.code_files
+        ));
         assert!(search_codefile(
             &temp_dir
                 .path()
@@ -564,6 +567,7 @@ rust:
                 .to_str()
                 .unwrap()
                 .to_string(),
-                &finder.code_files));
+            &finder.code_files
+        ));
     }
 }

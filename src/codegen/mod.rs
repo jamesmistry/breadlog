@@ -1,4 +1,4 @@
-pub use finder::CodeFinder;
 pub use finder::CodeFile;
-pub mod generate;
+pub use finder::CodeFinder;
 pub mod finder;
+pub mod generate;

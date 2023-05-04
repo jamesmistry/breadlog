@@ -1,9 +1,9 @@
-use regex::Regex;
 use lazy_static::lazy_static;
+use regex::Regex;
 use std::vec::Vec;
 
-use crate::config::Config;
 use super::rust_parser::rust_log_ref_finder;
+use crate::config::Config;
 
 #[derive(Copy, Clone)]
 pub struct CodePosition
@@ -22,7 +22,8 @@ pub struct LogRefEntry
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
-pub enum CodeLanguage {
+pub enum CodeLanguage
+{
     Rust = 0,
 }
 
@@ -30,7 +31,7 @@ pub fn find_references(language: CodeLanguage, code: &String, config: &Config) -
 {
     match language
     {
-        CodeLanguage::Rust => 
+        CodeLanguage::Rust =>
         {
             return rust_log_ref_finder::find(code, config);
         },

@@ -117,9 +117,9 @@ pub mod rust_log_ref_finder
 #[cfg(test)]
 mod tests
 {
+    use super::rust_log_ref_finder;
     use super::LogRefEntry;
     use crate::config::Context;
-    use super::rust_log_ref_finder;
     use std::str::FromStr;
     use test_log::test;
 
@@ -140,7 +140,8 @@ rust:
       name: test_macro3
 "#
             .to_string(),
-        false,)
+            false,
+        )
         .unwrap();
 
         context
