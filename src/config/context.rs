@@ -43,7 +43,7 @@ impl Context
         {
             Ok(loaded_config) => Ok(Self {
                 config: loaded_config,
-                check_mode: check_mode,
+                check_mode,
                 stop_commanded: Arc::new(atomic::AtomicBool::new(false)),
             }),
 

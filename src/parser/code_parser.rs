@@ -33,7 +33,7 @@ pub fn find_references(language: CodeLanguage, code: &String, config: &Config) -
     {
         CodeLanguage::Rust =>
         {
-            return rust_log_ref_finder::find(code, config);
+            rust_log_ref_finder::find(code, config)
         },
     }
 }

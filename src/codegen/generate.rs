@@ -83,7 +83,7 @@ where
     let config_task_outer = context.config.clone();
     let stop_flag = context.stop_commanded.clone();
 
-    return task::block_on(async {
+    task::block_on(async {
         let mut all_map_results = Vec::new();
 
         for file in finder.code_files.iter()
@@ -123,7 +123,7 @@ where
         }
 
         ProcessorType::reduce(&all_map_results)
-    });
+    })
 }
 
 pub fn generate_code<'generator>(context: &'generator Context) -> Result<u32, &'static str>

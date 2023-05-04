@@ -77,7 +77,7 @@ fn main() -> Result<(), u32>
 
     let app_context = match app_context_parsed
     {
-        Err(e) => return Err(INIT_ERR_CODE),
+        Err(_e) => return Err(INIT_ERR_CODE),
         Ok(c) => c,
     };
 
