@@ -40,9 +40,9 @@ jobs:
       run: "rustup component add llvm-tools-preview"
     - name: Setup | LLVM helper
       run: "cargo install cargo-binutils && rustup component add llvm-tools-preview"
-    - name: Build | App - Release
+    - name: Build Release | App
       run: "cargo build --release"
-    - name: Build | App - Debug
+    - name: Build Debug | App
       run: "LLVM_PROFILE_FILE='profiler_output.profraw' RUSTFLAGS='-C instrument-coverage' cargo build"
     - name: Small tests | App
       run: './.github/workflows/test_with_coverage.bash "$(pwd)" &> ./small_test_coverage_report.txt && cat ./small_test_coverage_report.txt'
