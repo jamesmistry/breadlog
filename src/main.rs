@@ -1,4 +1,10 @@
+extern crate pest;
+#[macro_use]
+extern crate pest_derive;
+
+mod codegen;
 mod config;
+mod parser;
 
 use clap::Parser;
 use log::{error, info};
@@ -17,9 +23,13 @@ struct ProgArgs
     #[clap(short, long, value_parser)]
     /// YAML configuration file. Its format is described in detail at https://example.com/docs
     config: String,
+
+    #[clap(long, default_value_t = false)]
+    /// Check all log messages have valid references, but don't modify any code. If the check fails, exits with a non-zero code.
+    check: bool,
 }
 
-fn setup_context(config_filename: &String) -> Result<config::Context, u32>
+fn setup_context(config_filename: &String, check_mode: bool) -> Result<config::Context, u32>
 {
     let config_contents = fs::read_to_string(&config_filename);
 
@@ -33,7 +43,7 @@ fn setup_context(config_filename: &String) -> Result<config::Context, u32>
             return Err(ERR_CODE_CONFIG_READ);
         },
 
-        Ok(yaml) => config::Context::new(yaml),
+        Ok(yaml) => config::Context::new(yaml, check_mode),
     };
 
     match app_ctx
@@ -46,7 +56,7 @@ fn setup_context(config_filename: &String) -> Result<config::Context, u32>
 
         Ok(ctx) =>
         {
-            info!("Configuration loaded OK!");
+            info!("Configuration loaded!");
             Ok(ctx)
         },
     }
@@ -54,13 +64,40 @@ fn setup_context(config_filename: &String) -> Result<config::Context, u32>
 
 fn main() -> Result<(), u32>
 {
+    use std::sync::Arc;
+
+    const INIT_ERR_CODE: u32 = 1;
+    const CODE_GEN_ERR_CODE: u32 = 2;
+
     SimpleLogger::new().init().unwrap();
 
     let args = ProgArgs::parse();
 
-    if let Err(e) = setup_context(&args.config)
+    let app_context_parsed = setup_context(&args.config, args.check);
+
+    let app_context = match app_context_parsed
     {
-        return Err(e);
+        Err(e) => return Err(INIT_ERR_CODE),
+        Ok(c) => c,
+    };
+
+    /*
+     * Set up the signal handler.
+     */
+    if signal_hook::flag::register(
+        signal_hook::consts::SIGTERM | signal_hook::consts::SIGINT,
+        Arc::clone(&app_context.stop_commanded),
+    )
+    .is_err()
+    {
+        error!("Failed to register signal handler");
+        return Err(INIT_ERR_CODE);
+    }
+
+    if let Err(err) = codegen::generate::generate_code(&app_context)
+    {
+        error!("Failed or incomplete code generation: {}", err);
+        return Err(CODE_GEN_ERR_CODE);
     }
 
     Ok(())
@@ -84,7 +121,7 @@ mod tests
         let invalid_file_path_string = String::from(invalid_file_path.to_str().unwrap());
 
         assert_eq!(invalid_file_path.exists(), false);
-        assert!(setup_context(&invalid_file_path_string).is_err());
+        assert!(setup_context(&invalid_file_path_string, false).is_err());
     }
 
     #[test]
@@ -106,6 +143,6 @@ mod tests
         .unwrap();
 
         assert_eq!(config_file_path.exists(), true);
-        assert!(setup_context(&config_file_path_string).is_err());
+        assert!(setup_context(&config_file_path_string, false).is_err());
     }
 }
