@@ -16,9 +16,9 @@ pub struct CodePosition
 #[derive(Clone)]
 pub struct LogRefEntry
 {
-    pub position: CodePosition,
-    pub reference: Option<u32>,
-    pub macro_name: String,
+    position: CodePosition,
+    reference: Option<u32>,
+    _macro_name: String,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
@@ -27,14 +27,11 @@ pub enum CodeLanguage
     Rust = 0,
 }
 
-pub fn find_references(language: CodeLanguage, code: &String, config: &Config) -> Vec<LogRefEntry>
+pub fn find_references(language: CodeLanguage, code: &str, config: &Config) -> Vec<LogRefEntry>
 {
     match language
     {
-        CodeLanguage::Rust =>
-        {
-            rust_log_ref_finder::find(code, config)
-        },
+        CodeLanguage::Rust => rust_log_ref_finder::find(code, config),
     }
 }
 
@@ -67,12 +64,12 @@ impl CodePosition
 
 impl LogRefEntry
 {
-    pub fn new(position: CodePosition, reference: Option<u32>, macro_name: String) -> LogRefEntry
+    pub fn new(position: CodePosition, reference: Option<u32>, _macro_name: String) -> LogRefEntry
     {
         LogRefEntry {
             position,
             reference,
-            macro_name,
+            _macro_name,
         }
     }
 
@@ -122,9 +119,9 @@ impl LogRefEntry
     }
 
     /// Returns the name of the macro used to log the message.
-    pub fn macro_name(&self) -> &str
+    pub fn _macro_name(&self) -> &str
     {
-        self.macro_name.as_str()
+        self._macro_name.as_str()
     }
 }
 
@@ -154,7 +151,7 @@ mod tests
         assert_eq!(subject.position().character(), 10);
         assert_eq!(subject.position().line(), 5);
         assert_eq!(subject.position().column(), 2);
-        assert_eq!(subject.macro_name(), "test_macro");
+        assert_eq!(subject._macro_name(), "test_macro");
     }
 
     #[test]
@@ -177,7 +174,7 @@ mod tests
         assert_eq!(subject.position().character(), 10);
         assert_eq!(subject.position().line(), 5);
         assert_eq!(subject.position().column(), 2);
-        assert_eq!(subject.macro_name(), "test_macro");
+        assert_eq!(subject._macro_name(), "test_macro");
     }
 
     #[test]
