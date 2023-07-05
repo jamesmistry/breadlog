@@ -147,7 +147,7 @@ rust:
             source_dir
         );
 
-        Context::new(test_config, false).unwrap()
+        Context::new(test_config, &"/tmp".to_string(), false).unwrap()
     }
 
     fn search_codefile(needle: &String, haystack: &Vec<CodeFile>) -> bool
