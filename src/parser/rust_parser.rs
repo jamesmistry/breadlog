@@ -12,7 +12,7 @@ pub mod rust_log_ref_finder
 {
     use super::*;
 
-    pub fn find(code: &String, config: &Config) -> Vec<LogRefEntry>
+    pub fn find(code: &str, config: &Config) -> Vec<LogRefEntry>
     {
         let mut result = Vec::new();
 
@@ -26,6 +26,7 @@ pub mod rust_log_ref_finder
                 {
                     let mut inner_rules = found.into_inner();
 
+                    // macro_name
                     let inner_rule = inner_rules.next();
 
                     let macro_name: &str = match inner_rule
@@ -34,17 +35,23 @@ pub mod rust_log_ref_finder
                         Some(rule) => rule.as_str(),
                     };
 
+                    // string_arg
                     let rule_l1 = inner_rules.next();
+
+                    // string_literal
                     let rule_l2 = match rule_l1
                     {
                         None => continue,
                         Some(rule) => rule.into_inner().next(),
                     };
+
+                    // string_value
                     let rule_l3 = match rule_l2
                     {
                         None => continue,
                         Some(rule) => rule.into_inner().next(),
                     };
+
                     let char_span = match rule_l3
                     {
                         None => continue,
@@ -140,6 +147,7 @@ rust:
       name: test_macro3
 "#
             .to_string(),
+            &"/tmp".to_string(),
             false,
         )
         .unwrap();
@@ -164,7 +172,7 @@ rust:
         let found_macros = apply_grammar_to_string(test_data);
 
         assert_eq!(found_macros.len(), 1);
-        assert_eq!(found_macros[0].macro_name(), "test_macro");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
         assert_eq!(found_macros[0].position().character(), 13);
         assert_eq!(found_macros[0].position().line(), 1);
         assert_eq!(found_macros[0].position().column(), 14);
@@ -179,12 +187,12 @@ rust:
         let found_macros = apply_grammar_to_string(test_data);
 
         assert_eq!(found_macros.len(), 2);
-        assert_eq!(found_macros[0].macro_name(), "test_macro1");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro1");
         assert_eq!(found_macros[0].position().character(), 14);
         assert_eq!(found_macros[0].position().line(), 1);
         assert_eq!(found_macros[0].position().column(), 15);
         assert_eq!(found_macros[0].reference(), None);
-        assert_eq!(found_macros[1].macro_name(), "test_macro2");
+        assert_eq!(found_macros[1]._macro_name(), "test_macro2");
         assert_eq!(found_macros[1].position().character(), 46);
         assert_eq!(found_macros[1].position().line(), 2);
         assert_eq!(found_macros[1].position().column(), 15);
@@ -200,12 +208,12 @@ rust:
         let found_macros = apply_grammar_to_string(test_data);
 
         assert_eq!(found_macros.len(), 2);
-        assert_eq!(found_macros[0].macro_name(), "test_macro1");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro1");
         assert_eq!(found_macros[0].position().character(), 14);
         assert_eq!(found_macros[0].position().line(), 1);
         assert_eq!(found_macros[0].position().column(), 15);
         assert_eq!(found_macros[0].reference(), None);
-        assert_eq!(found_macros[1].macro_name(), "test_macro2");
+        assert_eq!(found_macros[1]._macro_name(), "test_macro2");
         assert_eq!(found_macros[1].position().character(), 48);
         assert_eq!(found_macros[1].position().line(), 2);
         assert_eq!(found_macros[1].position().column(), 15);
@@ -220,7 +228,7 @@ rust:
         let found_macros = apply_grammar_to_string(test_data);
 
         assert_eq!(found_macros.len(), 1);
-        assert_eq!(found_macros[0].macro_name(), "test_macro2");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro2");
         assert_eq!(found_macros[0].position().character(), 47);
         assert_eq!(found_macros[0].position().line(), 2);
         assert_eq!(found_macros[0].position().column(), 15);
@@ -255,7 +263,7 @@ rust:
         let found_macros = apply_grammar_to_string(test_data);
 
         assert_eq!(found_macros.len(), 1);
-        assert_eq!(found_macros[0].macro_name(), "test_macro");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
         assert_eq!(found_macros[0].position().character(), 33);
         assert_eq!(found_macros[0].position().line(), 1);
         assert_eq!(found_macros[0].position().column(), 34);
@@ -300,7 +308,7 @@ rust:
         let found_macros = apply_grammar_to_string(test_data);
 
         assert_eq!(found_macros.len(), 1);
-        assert_eq!(found_macros[0].macro_name(), "test_macro");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
         assert_eq!(found_macros[0].position().character(), 17);
         assert_eq!(found_macros[0].position().line(), 1);
         assert_eq!(found_macros[0].position().column(), 18);
@@ -315,7 +323,7 @@ rust:
         let found_macros = apply_grammar_to_string(test_data);
 
         assert_eq!(found_macros.len(), 1);
-        assert_eq!(found_macros[0].macro_name(), "test_macro");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
         assert_eq!(found_macros[0].position().character(), 32);
         assert_eq!(found_macros[0].position().line(), 1);
         assert_eq!(found_macros[0].position().column(), 33);
@@ -372,7 +380,7 @@ rust:
 
         assert_eq!(found_macros.len(), 1);
         assert_eq!(found_macros[0].reference(), Some(1234));
-        assert_eq!(found_macros[0].macro_name(), "test_macro");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
     }
 
     #[test]
@@ -384,6 +392,52 @@ rust:
 
         assert_eq!(found_macros.len(), 1);
         assert_eq!(found_macros[0].reference(), Some(1234));
-        assert_eq!(found_macros[0].macro_name(), "test_macro3");
+        assert_eq!(found_macros[0]._macro_name(), "test_macro3");
+    }
+
+    #[test]
+    fn test_grammar_target_arg()
+    {
+        let test_data = "test_macro!(target: \"test_target\", \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 36);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 37);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_target_arg_multiple_macros()
+    {
+        let test_data = "test_macro1!(target: \"test_target1\", \"Test string 1.\");\ntest_macro2!(target: \"test_target2\", \"Test string 2.\");\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 2);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro1");
+        assert_eq!(found_macros[0].position().character(), 38);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 39);
+        assert_eq!(found_macros[0].reference(), None);
+        assert_eq!(found_macros[1]._macro_name(), "test_macro2");
+        assert_eq!(found_macros[1].position().character(), 94);
+        assert_eq!(found_macros[1].position().line(), 2);
+        assert_eq!(found_macros[1].position().column(), 39);
+        assert_eq!(found_macros[1].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_target_arg_extract_reference()
+    {
+        let test_data = "test_macro!(target: \"test_target1\", \"[ref: 1234] Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0].reference(), Some(1234));
     }
 }

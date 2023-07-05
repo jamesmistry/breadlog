@@ -5,7 +5,10 @@ COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ ANY* ~ ("\n" | EOI)) }
 
 string_value = @{ (!(!"\\"{1} ~ "\"") ~ ANY)* }
 string_literal = { "\"" ~ string_value ~ (!"\\"{1} ~ "\"") }
-string_arg = { "(" ~ string_literal }
+silent_string_value = _{ (!(!"\\"{1} ~ "\"") ~ ANY)* }
+silent_string_literal = _{ "\"" ~ silent_string_value ~ (!"\\"{1} ~ "\"") }
+target_arg = _{ ("target:" ~ silent_string_literal ~ ","){0, 1} }
+string_arg = { "(" ~ target_arg ~ string_literal }
 macro_name = { ((XID_START | "_") ~ (XID_CONTINUE ~ "::"?)*) }
 log_macro = { macro_name ~ "!" ~ string_arg }
 file =
