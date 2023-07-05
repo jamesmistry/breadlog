@@ -43,7 +43,16 @@ fn setup_context(config_filename: &String, check_mode: bool) -> Result<config::C
             return Err(ERR_CODE_CONFIG_READ);
         },
 
-        Ok(yaml) => config::Context::new(yaml, check_mode),
+        Ok(yaml) =>
+        {
+            let config_dir = match std::path::Path::new(&config_filename).parent()
+            {
+                None => String::from(""),
+                Some(p) => String::from(p.to_str().unwrap()),
+            };
+
+            config::Context::new(yaml, &config_dir, check_mode)
+        },
     };
 
     match app_ctx
@@ -94,10 +103,25 @@ fn main() -> Result<(), u32>
         return Err(INIT_ERR_CODE);
     }
 
-    if let Err(err) = codegen::generate::generate_code(&app_context)
+    if app_context.check_mode
     {
-        error!("Failed or incomplete code generation: {}", err);
-        return Err(CODE_GEN_ERR_CODE);
+        info!("Running in check mode");
+
+        if let Err(err) = codegen::generate::check_references(&app_context)
+        {
+            error!("Failed: {}", err);
+            return Err(CODE_GEN_ERR_CODE);
+        }
+    }
+    else
+    {
+        info!("Running in code generation mode");
+
+        if let Err(err) = codegen::generate::generate_code(&app_context)
+        {
+            error!("Failed: {}", err);
+            return Err(CODE_GEN_ERR_CODE);
+        }
     }
 
     Ok(())
