@@ -31,7 +31,7 @@ struct ProgArgs
 
 fn setup_context(config_filename: &String, check_mode: bool) -> Result<config::Context, u32>
 {
-    let config_contents = fs::read_to_string(&config_filename);
+    let config_contents = fs::read_to_string(config_filename);
 
     info!("Reading configuration file: {}", config_filename);
 
@@ -45,7 +45,7 @@ fn setup_context(config_filename: &String, check_mode: bool) -> Result<config::C
 
         Ok(yaml) =>
         {
-            let config_dir = match std::path::Path::new(&config_filename).parent()
+            let config_dir = match std::path::Path::new(config_filename).parent()
             {
                 None => String::from(""),
                 Some(p) => String::from(p.to_str().unwrap()),

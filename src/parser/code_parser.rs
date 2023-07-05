@@ -103,7 +103,7 @@ impl LogRefEntry
     /// Is a valid log reference present? Returns true if a valid log reference is present, false otherwise.
     pub fn exists(&self) -> bool
     {
-        self.reference != None
+        self.reference.is_some()
     }
 
     /// Returns the position of the log reference in the source code.

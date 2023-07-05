@@ -76,7 +76,7 @@ impl ReferenceProcessor<u32, u32, u32> for NextReferenceIdProcessor
 
 async fn load_code(path: &String) -> Option<String>
 {
-    return match async_std::fs::read_to_string(path).await
+    match async_std::fs::read_to_string(path).await
     {
         Ok(v) => Some(v),
         Err(e) =>
@@ -84,7 +84,7 @@ async fn load_code(path: &String) -> Option<String>
             error!("Failed to read file {}: {}", path, e);
             None
         },
-    };
+    }
 }
 
 struct CountMissingReferenceIdProcessor {}
@@ -102,7 +102,7 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
 
         for reference in entries.iter()
         {
-            if reference.reference() == None
+            if reference.reference().is_none()
             {
                 missing_ref_count += 1;
 
@@ -359,7 +359,7 @@ where
     })
 }
 
-pub fn check_references<'generator>(context: &'generator Context) -> Result<u32, &'static str>
+pub fn check_references(context: &Context) -> Result<u32, &'static str>
 {
     if let Some(finder) = CodeFinder::new(context)
     {
@@ -382,7 +382,7 @@ pub fn check_references<'generator>(context: &'generator Context) -> Result<u32,
     Ok(0)
 }
 
-pub fn generate_code<'generator>(context: &'generator Context) -> Result<u32, &'static str>
+pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 {
     if let Some(finder) = CodeFinder::new(context)
     {
