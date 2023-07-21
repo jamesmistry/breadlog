@@ -24,3 +24,7 @@ walkdir = "2"
 tempdir = "0.3.7"
 signal-hook = "0.3.15"
 testing_logger = "0.1.1"
+uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
+async-trait = "0.1.71"
+tracing = "0.1"
+tracing-test = "0.2"

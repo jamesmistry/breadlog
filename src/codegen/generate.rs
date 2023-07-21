@@ -1,20 +1,22 @@
 use async_std::task;
-use tempfile::NamedTempFile;
 
 use super::CodeFinder;
 use crate::config::Context;
 use crate::parser;
+use async_trait::async_trait;
 use log::error;
 use log::warn;
-use std::io::Write;
+use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
+use tracing;
 
 const START_REFERENCE_ID: u32 = 1;
 
+#[async_trait]
 pub trait ReferenceProcessor<Params, MapResult, ReduceResult>
 {
-    fn map(
+    async fn map(
         path: &str,
         file_contents: &str,
         params: &Option<Params>,
@@ -25,9 +27,10 @@ pub trait ReferenceProcessor<Params, MapResult, ReduceResult>
 
 struct NextReferenceIdProcessor {}
 
+#[async_trait]
 impl ReferenceProcessor<u32, u32, u32> for NextReferenceIdProcessor
 {
-    fn map(
+    async fn map(
         _path: &str,
         _file_contents: &str,
         _params: &Option<u32>,
@@ -81,17 +84,54 @@ async fn load_code(path: &String) -> Option<String>
         Ok(v) => Some(v),
         Err(e) =>
         {
-            error!("Failed to read file {}: {}", path, e);
+            let path_copy = path.clone();
+            task::spawn(async move {
+                error!("Failed to read file {}: {}", path_copy, e);
+            })
+            .await;
+
             None
         },
     }
 }
 
+async fn create_temp_file() -> Result<(String, async_std::fs::File), String>
+{
+    use std::env::temp_dir;
+    use uuid::Uuid;
+
+    let mut file_path = temp_dir();
+    file_path.push(format!("breadlog-{}.tmp", Uuid::new_v4()));
+
+    let path_result = match file_path.to_str()
+    {
+        Some(p) => match String::from_str(p)
+        {
+            Ok(s) => s,
+            Err(e) =>
+            {
+                return Err(format!(
+                    "Failed to convert temporary file path to string: {}",
+                    e
+                ))
+            },
+        },
+        None => return Err("Failed to convert temporary file path to string".to_string()),
+    };
+
+    match async_std::fs::File::create(file_path).await
+    {
+        Ok(f) => Ok((path_result, f)),
+        Err(e) => Err(format!("Failed to create temporary file: {}", e)),
+    }
+}
+
 struct CountMissingReferenceIdProcessor {}
 
+#[async_trait]
 impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
 {
-    fn map(
+    async fn map(
         path: &str,
         _file_contents: &str,
         _params: &Option<u32>,
@@ -106,11 +146,23 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
             {
                 missing_ref_count += 1;
 
-                warn!(
-                    "Missing reference in file {}, line {}, column {}",
-                    path,
-                    reference.position().line(),
-                    reference.position().column(),
+                let path_copy = path.to_string();
+                let line = reference.position().line();
+                let column = reference.position().column();
+
+                task::spawn(async move {
+                    warn!(
+                        "Missing reference in file {}, line {}, column {}",
+                        path_copy, line, column,
+                    );
+                })
+                .await;
+
+                tracing::event!(
+                    tracing::Level::TRACE,
+                    "missing_reference_{}_{}",
+                    line,
+                    column
                 );
             }
         }
@@ -141,10 +193,11 @@ struct InsertReferencesResult
 
 struct InsertReferencesProcessor {}
 
+#[async_trait]
 impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferencesResult>
     for InsertReferencesProcessor
 {
-    fn map(
+    async fn map(
         path: &str,
         file_contents: &str,
         params: &Option<Arc<AtomicU32>>,
@@ -158,31 +211,41 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             Some(next_id) => next_id,
             None =>
             {
-                error!("Unexpected missing next reference ID during reference insert");
+                task::spawn(async {
+                    error!("Unexpected missing next reference ID during reference insert");
+                })
+                .await;
+
+                tracing::event!(tracing::Level::TRACE, "unexpected_next_reference_id");
+
                 return Some(InsertReferencesResult {
                     failure: true,
                     num_inserted_references: 0,
                 });
             },
         };
+
+        use async_std::io::WriteExt;
 
         /* Create a temporary file to write the new contents to. Once the file is written,
          * it will be moved to the original file.
          */
-        let mut temp_file = match NamedTempFile::new()
+        let mut scratch_file = match create_temp_file().await
         {
             Ok(f) => f,
             Err(e) =>
             {
-                error!("Failed to create temporary file: {}", e);
+                task::spawn(async move {
+                    error!("Failed to create temporary file: {}", e);
+                })
+                .await;
+
                 return Some(InsertReferencesResult {
                     failure: true,
                     num_inserted_references: 0,
                 });
             },
         };
-
-        let scratch_file = temp_file.as_file_mut();
 
         let mut unwritten_content_start_pos: usize = 0;
 
@@ -192,10 +255,16 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
 
             if insert_pos < unwritten_content_start_pos
             {
-                error!(
-                    "Unexpected reference insert position {} before cursor position {}",
-                    insert_pos, unwritten_content_start_pos,
-                );
+                task::spawn(async move {
+                    error!(
+                        "Unexpected reference insert position {} before cursor position {}",
+                        insert_pos, unwritten_content_start_pos,
+                    );
+                })
+                .await;
+
+                tracing::event!(tracing::Level::TRACE, "unexpected_reference_insert_pos");
+
                 return Some(InsertReferencesResult {
                     failure: true,
                     num_inserted_references: 0,
@@ -203,12 +272,18 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             }
 
             match scratch_file
+                .1
                 .write_all(&file_contents.as_bytes()[unwritten_content_start_pos..insert_pos])
+                .await
             {
                 Ok(_) => (),
                 Err(e) =>
                 {
-                    error!("Failed to write to temporary file: {}", e);
+                    task::spawn(async move {
+                        error!("Failed to write to temporary file: {}", e);
+                    })
+                    .await;
+
                     return Some(InsertReferencesResult {
                         failure: true,
                         num_inserted_references: 0,
@@ -221,12 +296,16 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             let reference_id = next_reference_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let message_header = format!("[ref: {}] ", reference_id);
 
-            match scratch_file.write_all(message_header.as_bytes())
+            match scratch_file.1.write_all(message_header.as_bytes()).await
             {
                 Ok(_) => (),
                 Err(e) =>
                 {
-                    error!("Failed to write to temporary file: {}", e);
+                    task::spawn(async move {
+                        error!("Failed to write to temporary file: {}", e);
+                    })
+                    .await;
+
                     return Some(InsertReferencesResult {
                         failure: true,
                         num_inserted_references: 0,
@@ -240,14 +319,21 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
         let end_of_file_index = file_contents.len();
         if unwritten_content_start_pos < end_of_file_index
         {
-            match scratch_file.write_all(
-                &file_contents.as_bytes()[unwritten_content_start_pos..end_of_file_index],
-            )
+            match scratch_file
+                .1
+                .write_all(
+                    &file_contents.as_bytes()[unwritten_content_start_pos..end_of_file_index],
+                )
+                .await
             {
                 Ok(_) => (),
                 Err(e) =>
                 {
-                    error!("Failed to write to temporary file: {}", e);
+                    task::spawn(async move {
+                        error!("Failed to write to temporary file: {}", e);
+                    })
+                    .await;
+
                     return Some(InsertReferencesResult {
                         failure: true,
                         num_inserted_references: 0,
@@ -256,23 +342,30 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             }
         }
 
-        match std::fs::rename(temp_file.path(), path)
+        match async_std::fs::rename(scratch_file.0, path).await
         {
-            Ok(_) => (),
+            Ok(_) =>
+            {
+                return Some(InsertReferencesResult {
+                    failure: false,
+                    num_inserted_references: created_entries,
+                });
+            },
             Err(e) =>
             {
-                error!("Failed to rename temporary file: {}", e);
+                task::spawn(async move {
+                    error!("Failed to rename temporary file: {}", e);
+                })
+                .await;
+
+                tracing::event!(tracing::Level::TRACE, "failed_to_rename_temp_file");
+
                 return Some(InsertReferencesResult {
                     failure: true,
                     num_inserted_references: created_entries,
                 });
             },
         }
-
-        Some(InsertReferencesResult {
-            failure: false,
-            num_inserted_references: created_entries,
-        })
     }
 
     fn reduce(map_results: &[InsertReferencesResult]) -> Option<InsertReferencesResult>
@@ -325,28 +418,19 @@ where
             let config_task_inner = config_task_outer.clone();
             let params_task_inner = params.clone();
 
-            if let Some(map_result) = async_std::task::spawn(async move {
-                if let Some(file_contents) = load_code(&path).await
-                {
-                    let references = parser::code_parser::find_references(
-                        language,
-                        &file_contents,
-                        &config_task_inner,
-                    );
-
-                    return ProcessorType::map(
-                        &path,
-                        &file_contents,
-                        &params_task_inner,
-                        &references,
-                    );
-                }
-
-                None
-            })
-            .await
+            if let Some(file_contents) = load_code(&path).await
             {
-                all_map_results.push(map_result);
+                let references = parser::code_parser::find_references(
+                    language,
+                    &file_contents,
+                    &config_task_inner,
+                );
+
+                if let Some(map_result) =
+                    ProcessorType::map(&path, &file_contents, &params_task_inner, &references).await
+                {
+                    all_map_results.push(map_result);
+                }
             }
         }
 
@@ -401,14 +485,15 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 #[cfg(test)]
 mod tests
 {
-
-    use log::Level;
+    use async_trait::async_trait;
+    use futures::AsyncWriteExt;
     use std::fs::File;
     use std::io::Read;
     use std::io::Write;
     use std::str::FromStr;
     use tempdir::TempDir;
     extern crate testing_logger;
+    use tracing_test::traced_test;
 
     use super::process_references;
     use super::CountMissingReferenceIdProcessor;
@@ -422,9 +507,10 @@ mod tests
 
     struct TestRefProcCount {}
 
+    #[async_trait]
     impl ReferenceProcessor<u32, u32, u32> for TestRefProcCount
     {
-        fn map(
+        async fn map(
             path: &str,
             _file_contents: &str,
             _params: &Option<u32>,
@@ -483,26 +569,26 @@ rust:
         context
     }
 
-    #[test]
-    fn test_next_ref_id_map_no_entries()
+    #[test_log::test(async_std::test)]
+    async fn test_next_ref_id_map_no_entries()
     {
         const TEST_PATH: &str = "test.rs";
         let test_contents = String::new();
         let test_entries: Vec<parser::LogRefEntry> = Vec::new();
 
-        assert_eq!(
-            NextReferenceIdProcessor::map(
-                &String::from(TEST_PATH),
-                &test_contents,
-                &None,
-                &test_entries
-            ),
-            None
-        );
+        let map_result = NextReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
+
+        assert_eq!(map_result, None);
     }
 
-    #[test]
-    fn test_next_ref_id_map_none_entries()
+    #[test_log::test(async_std::test)]
+    async fn test_next_ref_id_map_none_entries()
     {
         const TEST_PATH: &str = "test.rs";
         let test_contents = String::new();
@@ -520,19 +606,19 @@ rust:
             test_entries.push(entry);
         }
 
-        assert_eq!(
-            NextReferenceIdProcessor::map(
-                &String::from(TEST_PATH),
-                &test_contents,
-                &None,
-                &test_entries
-            ),
-            None
-        );
+        let map_result = NextReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
+
+        assert_eq!(map_result, None);
     }
 
-    #[test]
-    fn test_next_ref_id_map_max_calc()
+    #[test_log::test(async_std::test)]
+    async fn test_next_ref_id_map_max_calc()
     {
         const TEST_PATH: &str = "test.rs";
         let test_contents = String::new();
@@ -559,15 +645,15 @@ rust:
             test_entries.push(entry);
         }
 
-        assert_eq!(
-            NextReferenceIdProcessor::map(
-                &String::from(TEST_PATH),
-                &test_contents,
-                &None,
-                &test_entries
-            ),
-            Some(8)
-        );
+        let map_result = NextReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
+
+        assert_eq!(map_result, Some(8));
     }
 
     #[test]
@@ -600,26 +686,26 @@ rust:
         assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some(5));
     }
 
-    #[test]
-    fn test_missing_ref_map_no_refs()
+    #[test_log::test(async_std::test)]
+    async fn test_missing_ref_map_no_refs()
     {
         const TEST_PATH: &str = "test.rs";
         let test_contents = String::new();
         let test_entries: Vec<parser::LogRefEntry> = Vec::new();
 
-        assert_eq!(
-            CountMissingReferenceIdProcessor::map(
-                &String::from(TEST_PATH),
-                &test_contents,
-                &None,
-                &test_entries
-            ),
-            Some(0)
-        );
+        let map_result = CountMissingReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
+
+        assert_eq!(map_result, Some(0));
     }
 
-    #[test]
-    fn test_missing_ref_map_no_missing_refs()
+    #[test_log::test(async_std::test)]
+    async fn test_missing_ref_map_no_missing_refs()
     {
         const TEST_PATH: &str = "test.rs";
         let test_contents = String::new();
@@ -639,22 +725,21 @@ rust:
             test_entries.push(entry);
         }
 
-        assert_eq!(
-            CountMissingReferenceIdProcessor::map(
-                &String::from(TEST_PATH),
-                &test_contents,
-                &None,
-                &test_entries
-            ),
-            Some(0)
-        );
+        let map_result = CountMissingReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
+
+        assert_eq!(map_result, Some(0));
     }
 
-    #[test]
-    fn test_missing_ref_map_missing_refs()
+    #[test_log::test(async_std::test)]
+    #[traced_test]
+    async fn test_missing_ref_map_missing_refs()
     {
-        testing_logger::setup();
-
         const TEST_PATH: &str = "test.rs";
         let test_contents = String::new();
         let mut test_entries: Vec<parser::LogRefEntry> = Vec::new();
@@ -672,23 +757,25 @@ rust:
             test_entries.push(entry);
         }
 
-        assert_eq!(
-            CountMissingReferenceIdProcessor::map(
-                &String::from(TEST_PATH),
-                &test_contents,
-                &None,
-                &test_entries
-            ),
-            Some(1)
-        );
+        let map_result = CountMissingReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
 
-        testing_logger::validate(|captured_logs| {
-            assert_eq!(captured_logs.len(), 1);
-            assert_eq!(
-                captured_logs[0].body,
-                "Missing reference in file test.rs, line 5, column 6"
-            );
-            assert_eq!(captured_logs[0].level, Level::Warn);
+        assert_eq!(map_result, Some(1));
+
+        logs_assert(|lines: &[&str]| {
+            match lines
+                .iter()
+                .filter(|line| line.contains("missing_reference_5_6"))
+                .count()
+            {
+                1 => Ok(()),
+                n => Err(format!("More than 1 matching event: {}", n)),
+            }
         });
     }
 
@@ -1004,8 +1091,9 @@ fn test2() {
         assert_eq!(insert_result.num_inserted_references, 0);
     }
 
-    #[test]
-    fn test_process_insert_references_missing_next_id()
+    #[test_log::test(async_std::test)]
+    #[traced_test]
+    async fn test_process_insert_references_missing_next_id()
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let source_file_path = temp_dir
@@ -1019,32 +1107,20 @@ fn test2() {
         let file_contents = String::new();
         let test_entries: Vec<parser::LogRefEntry> = Vec::new();
 
-        testing_logger::setup();
-
         let insert_result =
             InsertReferencesProcessor::map(&source_file_path, &file_contents, &None, &test_entries)
+                .await
                 .unwrap();
 
         assert!(insert_result.failure);
         assert_eq!(insert_result.num_inserted_references, 0);
 
-        testing_logger::validate(|captured_logs| {
-            assert_eq!(
-                captured_logs
-                    .iter()
-                    .filter(|&message| {
-                        message.body
-                            == "Unexpected missing next reference ID during reference insert"
-                            && message.level == Level::Error
-                    })
-                    .count(),
-                1
-            );
-        });
+        assert!(logs_contain("unexpected_next_reference_id"));
     }
 
-    #[test]
-    fn test_process_insert_references_out_of_order_insert_pos()
+    #[test_log::test(async_std::test)]
+    #[traced_test]
+    async fn test_process_insert_references_out_of_order_insert_pos()
     {
         use std::sync::atomic::AtomicU32;
         use std::sync::Arc;
@@ -1087,8 +1163,6 @@ fn test1() {
             test_entries.push(entry);
         }
 
-        testing_logger::setup();
-
         let ref_value = AtomicU32::new(10);
         let ref_arc = Arc::<AtomicU32>::new(ref_value);
 
@@ -1098,29 +1172,26 @@ fn test1() {
             &Some(ref_arc),
             &test_entries,
         )
+        .await
         .unwrap();
 
         assert!(insert_result.failure);
         assert_eq!(insert_result.num_inserted_references, 0);
 
-        testing_logger::validate(|captured_logs| {
-            assert_eq!(
-                captured_logs
-                    .iter()
-                    .filter(|&message| {
-                        message
-                            .body
-                            .starts_with("Unexpected reference insert position")
-                            && message.level == Level::Error
-                    })
-                    .count(),
-                1
-            );
+        logs_assert(|lines: &[&str]| {
+            match lines
+                .iter()
+                .filter(|line| line.contains("unexpected_reference_insert_pos"))
+                .count()
+            {
+                1 => Ok(()),
+                n => Err(format!("More than 1 matching event: {}", n)),
+            }
         });
     }
 
-    #[test]
-    fn test_process_insert_references_empty_file()
+    #[test_log::test(async_std::test)]
+    async fn test_process_insert_references_empty_file()
     {
         use std::sync::atomic::AtomicU32;
         use std::sync::Arc;
@@ -1139,8 +1210,6 @@ fn test1() {
 
         let test_entries: Vec<parser::LogRefEntry> = Vec::new();
 
-        testing_logger::setup();
-
         let ref_value = AtomicU32::new(1);
         let ref_arc = Arc::<AtomicU32>::new(ref_value);
 
@@ -1150,14 +1219,16 @@ fn test1() {
             &Some(ref_arc),
             &test_entries,
         )
+        .await
         .unwrap();
 
         assert_eq!(insert_result.failure, false);
         assert_eq!(insert_result.num_inserted_references, 0);
     }
 
-    #[test]
-    fn test_process_insert_references_parent_dir_missing()
+    #[test_log::test(async_std::test)]
+    #[traced_test]
+    async fn test_process_insert_references_parent_dir_missing()
     {
         use std::sync::atomic::AtomicU32;
         use std::sync::Arc;
@@ -1189,8 +1260,6 @@ fn test1() {
             test_entries.push(entry);
         }
 
-        testing_logger::setup();
-
         let ref_value = AtomicU32::new(10);
         let ref_arc = Arc::<AtomicU32>::new(ref_value);
 
@@ -1200,22 +1269,21 @@ fn test1() {
             &Some(ref_arc),
             &test_entries,
         )
+        .await
         .unwrap();
 
         assert!(insert_result.failure);
         assert_eq!(insert_result.num_inserted_references, 1);
 
-        testing_logger::validate(|captured_logs| {
-            assert_eq!(
-                captured_logs
-                    .iter()
-                    .filter(|&message| {
-                        message.body.starts_with("Failed to rename temporary file:")
-                            && message.level == Level::Error
-                    })
-                    .count(),
-                1
-            );
+        logs_assert(|lines: &[&str]| {
+            match lines
+                .iter()
+                .filter(|line| line.contains("failed_to_rename_temp_file"))
+                .count()
+            {
+                1 => Ok(()),
+                n => Err(format!("More than 1 matching event: {}", n)),
+            }
         });
     }
 
@@ -1480,5 +1548,15 @@ fn test1() {
 
         assert_eq!(insert_result.failure, false);
         assert_eq!(insert_result.num_inserted_references, 0);
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_create_async_temp_file()
+    {
+        let mut temp_file_result = crate::codegen::generate::create_temp_file().await.unwrap();
+
+        let buffer = String::from_str("test").unwrap();
+        assert_ne!(temp_file_result.0, "");
+        assert!(temp_file_result.1.write(buffer.as_bytes()).await.is_ok());
     }
 }
