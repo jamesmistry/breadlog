@@ -13,6 +13,94 @@ use tracing;
 
 const START_REFERENCE_ID: u32 = 1;
 
+async fn load_code(path: &String) -> Option<String>
+{
+    match async_std::fs::read_to_string(path).await
+    {
+        Ok(v) => Some(v),
+        Err(e) =>
+        {
+            let path_copy = path.clone();
+            task::spawn(async move {
+                error!("Failed to read file {}: {}", path_copy, e);
+            })
+            .await;
+
+            None
+        },
+    }
+}
+
+struct AsyncTempFile
+{
+    path: String,
+    file: async_std::fs::File,
+}
+
+impl AsyncTempFile
+{
+    pub async fn new() -> Result<AsyncTempFile, String>
+    {
+        use std::env::temp_dir;
+        use uuid::Uuid;
+
+        let mut file_path = temp_dir();
+        file_path.push(format!("breadlog-{}.tmp", Uuid::new_v4()));
+
+        let path_result = match file_path.to_str()
+        {
+            Some(p) => match String::from_str(p)
+            {
+                Ok(s) => s,
+                Err(e) =>
+                {
+                    return Err(format!(
+                        "Failed to convert temporary file path to string: {}",
+                        e
+                    ))
+                },
+            },
+            None => return Err("Failed to convert temporary file path to string".to_string()),
+        };
+
+        match async_std::fs::File::create(file_path).await
+        {
+            Ok(f) => Ok(AsyncTempFile {
+                path: path_result,
+                file: f,
+            }),
+            Err(e) => Err(format!("Failed to create temporary file: {}", e)),
+        }
+    }
+
+    pub fn path(&self) -> &str
+    {
+        &self.path
+    }
+
+    pub fn file(&mut self) -> &mut async_std::fs::File
+    {
+        &mut self.file
+    }
+}
+
+impl Drop for AsyncTempFile
+{
+    fn drop(&mut self)
+    {
+        use std::fs::remove_file;
+
+        match remove_file(&self.path)
+        {
+            Ok(_) => (),
+            Err(e) =>
+            {
+                warn!("Failed to remove temporary file {}: {}", self.path, e);
+            },
+        }
+    }
+}
+
 #[async_trait]
 pub trait ReferenceProcessor<Params, MapResult, ReduceResult>
 {
@@ -74,55 +162,6 @@ impl ReferenceProcessor<u32, u32, u32> for NextReferenceIdProcessor
         }
 
         Some(reduce_result + 1)
-    }
-}
-
-async fn load_code(path: &String) -> Option<String>
-{
-    match async_std::fs::read_to_string(path).await
-    {
-        Ok(v) => Some(v),
-        Err(e) =>
-        {
-            let path_copy = path.clone();
-            task::spawn(async move {
-                error!("Failed to read file {}: {}", path_copy, e);
-            })
-            .await;
-
-            None
-        },
-    }
-}
-
-async fn create_temp_file() -> Result<(String, async_std::fs::File), String>
-{
-    use std::env::temp_dir;
-    use uuid::Uuid;
-
-    let mut file_path = temp_dir();
-    file_path.push(format!("breadlog-{}.tmp", Uuid::new_v4()));
-
-    let path_result = match file_path.to_str()
-    {
-        Some(p) => match String::from_str(p)
-        {
-            Ok(s) => s,
-            Err(e) =>
-            {
-                return Err(format!(
-                    "Failed to convert temporary file path to string: {}",
-                    e
-                ))
-            },
-        },
-        None => return Err("Failed to convert temporary file path to string".to_string()),
-    };
-
-    match async_std::fs::File::create(file_path).await
-    {
-        Ok(f) => Ok((path_result, f)),
-        Err(e) => Err(format!("Failed to create temporary file: {}", e)),
     }
 }
 
@@ -230,13 +269,13 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
         /* Create a temporary file to write the new contents to. Once the file is written,
          * it will be moved to the original file.
          */
-        let mut scratch_file = match create_temp_file().await
+        let mut scratch_file = match AsyncTempFile::new().await
         {
             Ok(f) => f,
             Err(e) =>
             {
                 task::spawn(async move {
-                    error!("Failed to create temporary file: {}", e);
+                    error!("{}", e);
                 })
                 .await;
 
@@ -272,7 +311,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             }
 
             match scratch_file
-                .1
+                .file()
                 .write_all(&file_contents.as_bytes()[unwritten_content_start_pos..insert_pos])
                 .await
             {
@@ -296,7 +335,10 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             let reference_id = next_reference_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
             let message_header = format!("[ref: {}] ", reference_id);
 
-            match scratch_file.1.write_all(message_header.as_bytes()).await
+            match scratch_file
+                .file()
+                .write_all(message_header.as_bytes())
+                .await
             {
                 Ok(_) => (),
                 Err(e) =>
@@ -320,7 +362,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
         if unwritten_content_start_pos < end_of_file_index
         {
             match scratch_file
-                .1
+                .file()
                 .write_all(
                     &file_contents.as_bytes()[unwritten_content_start_pos..end_of_file_index],
                 )
@@ -342,7 +384,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             }
         }
 
-        match async_std::fs::rename(scratch_file.0, path).await
+        match async_std::fs::rename(scratch_file.path(), path).await
         {
             Ok(_) =>
             {
@@ -1553,10 +1595,32 @@ fn test1() {
     #[test_log::test(async_std::test)]
     async fn test_create_async_temp_file()
     {
-        let mut temp_file_result = crate::codegen::generate::create_temp_file().await.unwrap();
+        use AsyncWriteExt;
 
-        let buffer = String::from_str("test").unwrap();
-        assert_ne!(temp_file_result.0, "");
-        assert!(temp_file_result.1.write(buffer.as_bytes()).await.is_ok());
+        let temp_file_path: String;
+
+        {
+            let mut temp_file_result = crate::codegen::generate::AsyncTempFile::new()
+                .await
+                .unwrap();
+            assert_eq!(
+                async_std::fs::metadata(temp_file_result.path())
+                    .await
+                    .is_ok(),
+                true
+            );
+
+            temp_file_path = temp_file_result.path().to_string();
+
+            let buffer = String::from_str("test").unwrap();
+            assert_ne!(temp_file_result.path(), "");
+            assert!(temp_file_result
+                .file()
+                .write(buffer.as_bytes())
+                .await
+                .is_ok());
+        }
+
+        assert_eq!(async_std::fs::metadata(temp_file_path).await.is_ok(), false);
     }
 }
