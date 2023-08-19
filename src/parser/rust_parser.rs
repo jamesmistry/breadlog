@@ -440,4 +440,25 @@ rust:
         assert_eq!(found_macros.len(), 1);
         assert_eq!(found_macros[0].reference(), Some(1234));
     }
+
+    #[test]
+    fn test_grammar_comment_handling()
+    {
+        let test_data = r#"
+            /// Single-line comment.
+            
+            /*
+                Multi-line comment.
+             */
+
+            /* Multi-line comment on a single line. */
+            
+            test_macro!("Reading configuration file: {}", config_filename);
+"#;
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0].reference(), None);
+    }
 }
