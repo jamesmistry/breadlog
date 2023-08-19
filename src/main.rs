@@ -7,7 +7,7 @@ mod config;
 mod parser;
 
 use clap::Parser;
-use log::{error, info};
+use log::{error, info, LevelFilter};
 use simple_logger::SimpleLogger;
 use std::fs;
 
@@ -78,7 +78,7 @@ fn main() -> Result<(), u32>
     const INIT_ERR_CODE: u32 = 1;
     const CODE_GEN_ERR_CODE: u32 = 2;
 
-    SimpleLogger::new().init().unwrap();
+    SimpleLogger::new().with_level(LevelFilter::Info).init().unwrap();
 
     let args = ProgArgs::parse();
 
