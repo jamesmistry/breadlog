@@ -6,6 +6,7 @@ use crate::parser;
 use async_trait::async_trait;
 use log::error;
 use log::warn;
+use log::info;
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
@@ -93,10 +94,10 @@ impl Drop for AsyncTempFile
         match remove_file(&self.path)
         {
             Ok(_) => (),
-            Err(e) =>
-            {
-                warn!("Failed to remove temporary file {}: {}", self.path, e);
-            },
+            /* The client may have performed a file operation which means it can't be deleted, so 
+               don't worry about errors.
+            */
+            Err(_) => (),
         }
     }
 }
@@ -206,6 +207,15 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
             }
         }
 
+        let path_copy = path.to_string();
+        task::spawn(async move {
+            info!(
+                "Total missing references in {}: {}",
+                path_copy, missing_ref_count
+            );
+        })
+        .await;
+
         Some(missing_ref_count)
     }
 
@@ -218,7 +228,7 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
             reduce_result += *map_result;
         }
 
-        warn!("Total missing references: {}", reduce_result);
+        info!("Total missing references (all files): {}", reduce_result);
 
         Some(reduce_result)
     }
@@ -243,6 +253,14 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
         entries: &[parser::LogRefEntry],
     ) -> Option<InsertReferencesResult>
     {
+        if entries.iter().filter(|&e|!e.exists()).count() == 0
+        {
+            return Some(InsertReferencesResult {
+                failure: false,
+                num_inserted_references: 0,
+            });
+        }
+
         let mut created_entries: usize = 0;
 
         let next_reference_id = match params
@@ -489,6 +507,13 @@ pub fn check_references(context: &Context) -> Result<u32, &'static str>
 {
     if let Some(finder) = CodeFinder::new(context)
     {
+        if finder.code_files.is_empty()
+        {
+            return Err("No files found");
+        }
+
+        info!("Found {} file(s)", finder.code_files.len());
+
         let missing_reference_count =
             process_references::<CountMissingReferenceIdProcessor, u32, u32, u32>(
                 context, None, &finder,
@@ -512,9 +537,29 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 {
     if let Some(finder) = CodeFinder::new(context)
     {
-        let _next_reference_id =
-            process_references::<NextReferenceIdProcessor, u32, u32, u32>(context, None, &finder)
-                .map_or(START_REFERENCE_ID, |id| id);
+        if finder.code_files.is_empty()
+        {
+            return Err("No files found");
+        }
+
+        info!("Found {} file(s)", finder.code_files.len());
+
+        let next_reference_id =
+            Arc::new(AtomicU32::new(process_references::<NextReferenceIdProcessor, u32, u32, u32>(context, None, &finder)
+                .map_or(START_REFERENCE_ID, |id| id)));
+
+        info!("Next reference ID: {}", next_reference_id.load(std::sync::atomic::Ordering::Relaxed));
+
+        match process_references::<
+                InsertReferencesProcessor,
+                Arc<AtomicU32>,
+                InsertReferencesResult,
+                InsertReferencesResult,
+            >(context, Some(next_reference_id), &finder)
+        {
+            Some(r) => r,
+            None => return Err("Failed to insert references"),
+        };
     }
     else
     {
