@@ -24,7 +24,7 @@ struct ProgArgs
     /// YAML configuration file. Its format is described in detail at https://example.com/docs
     config: String,
 
-    #[clap(long, default_value_t = false)]
+    #[clap(long, action)]
     /// Check all log messages have valid references, but don't modify any code. If the check fails, exits with a non-zero code.
     check: bool,
 }
