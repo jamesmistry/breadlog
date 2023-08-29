@@ -117,18 +117,19 @@ pub trait ReferenceProcessor<Params, MapResult, ReduceResult>
 struct NextReferenceIdProcessor {}
 
 #[async_trait]
-impl ReferenceProcessor<u32, u32, u32> for NextReferenceIdProcessor
+impl ReferenceProcessor<u32, (u32, usize), (u32, usize)> for NextReferenceIdProcessor
 {
     async fn map(
         _path: &str,
         _file_contents: &str,
         _params: &Option<u32>,
         entries: &[parser::LogRefEntry],
-    ) -> Option<u32>
+    ) -> Option<(u32, usize)>
     {
         use std::cmp;
 
         let mut max_file_ref: u32 = 0;
+        let mut num_missing_refs: usize = 0;
 
         for reference in entries.iter()
         {
@@ -136,33 +137,39 @@ impl ReferenceProcessor<u32, u32, u32> for NextReferenceIdProcessor
             {
                 max_file_ref = cmp::max(max_file_ref, reference_id);
             }
+            else
+            {
+                num_missing_refs += 1;
+            }
         }
 
         if max_file_ref > 0
         {
-            return Some(max_file_ref);
+            return Some((max_file_ref, num_missing_refs));
         }
 
         None
     }
 
-    fn reduce(map_results: &[u32]) -> Option<u32>
+    fn reduce(map_results: &[(u32, usize)]) -> Option<(u32, usize)>
     {
         use std::cmp;
 
-        let mut reduce_result: u32 = 0;
+        let mut ref_id_result: u32 = 0;
+        let mut missing_refs_result: usize = 0;
 
         for map_result in map_results.iter()
         {
-            reduce_result = cmp::max(reduce_result, *map_result);
+            ref_id_result = cmp::max(ref_id_result, map_result.0);
+            missing_refs_result += map_result.1;
         }
 
-        if reduce_result == 0
+        if ref_id_result == 0
         {
-            return Some(START_REFERENCE_ID);
+            return Some((START_REFERENCE_ID, missing_refs_result));
         }
 
-        Some(reduce_result + 1)
+        Some((ref_id_result + 1, missing_refs_result))
     }
 }
 
@@ -544,9 +551,25 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 
         info!("Found {} file(s)", finder.code_files.len());
 
+        let references_id_result = match process_references::<
+                NextReferenceIdProcessor,
+                u32,
+                (u32, usize),
+                (u32, usize),
+            >(context, None, &finder)
+        {
+            Some(r) => r,
+            None => return Err("Failed to determine next reference ID"),
+        };
+
+        if references_id_result.1 == 0
+        {
+            info!("No missing references - nothing to do");
+            return Ok(0);
+        }
+
         let next_reference_id =
-            Arc::new(AtomicU32::new(process_references::<NextReferenceIdProcessor, u32, u32, u32>(context, None, &finder)
-                .map_or(START_REFERENCE_ID, |id| id)));
+            Arc::new(AtomicU32::new(references_id_result.0));
 
         info!("Next reference ID: {}", next_reference_id.load(std::sync::atomic::Ordering::Relaxed));
 
@@ -740,37 +763,88 @@ rust:
         )
         .await;
 
-        assert_eq!(map_result, Some(8));
+        assert_eq!(map_result, Some((8, 0)));
+    }
+
+    #[test_log::test(async_std::test)]
+    async fn test_missing_refs_map_count()
+    {
+        const TEST_PATH: &str = "test.rs";
+        let test_contents = String::new();
+        let mut test_entries: Vec<parser::LogRefEntry> = Vec::new();
+
+        {
+            let code_pos = parser::CodePosition::new(1, 1, 1);
+            let entry =
+                parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            test_entries.push(entry);
+        }
+
+        {
+            let code_pos = parser::CodePosition::new(1, 2, 1);
+            let entry =
+                parser::LogRefEntry::new(code_pos, Some(3), String::from_str("test").unwrap());
+            test_entries.push(entry);
+        }
+
+        {
+            let code_pos = parser::CodePosition::new(1, 2, 1);
+            let entry =
+                parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            test_entries.push(entry);
+        }
+
+        let map_result = NextReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
+
+        assert_eq!(map_result, Some((3, 2)));
     }
 
     #[test]
     fn test_next_ref_id_reduce_no_results()
     {
-        let test_input: Vec<u32> = Vec::new();
-        assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some(1));
+        let test_input: Vec<(u32, usize)> = Vec::new();
+        assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some((1, 0)));
     }
 
     #[test]
     fn test_next_ref_id_reduce_default()
     {
-        let mut test_input: Vec<u32> = Vec::new();
+        let mut test_input: Vec<(u32, usize)> = Vec::new();
 
-        test_input.push(0);
-        test_input.push(0);
+        test_input.push((0, 0));
+        test_input.push((0, 0));
 
-        assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some(1));
+        assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some((1, 0)));
     }
 
     #[test]
     fn test_next_ref_id_reduce_max()
     {
-        let mut test_input: Vec<u32> = Vec::new();
+        let mut test_input: Vec<(u32, usize)> = Vec::new();
 
-        test_input.push(4);
-        test_input.push(2);
-        test_input.push(1);
+        test_input.push((4, 0));
+        test_input.push((2, 0));
+        test_input.push((1, 0));
 
-        assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some(5));
+        assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some((5, 0)));
+    }
+
+    #[test]
+    fn test_next_ref_id_missing_ref_reduce_count()
+    {
+        let mut test_input: Vec<(u32, usize)> = Vec::new();
+
+        test_input.push((4, 1));
+        test_input.push((2, 2));
+        test_input.push((1, 4));
+
+        assert_eq!(NextReferenceIdProcessor::reduce(&test_input), Some((5, 7)));
     }
 
     #[test_log::test(async_std::test)]
@@ -1140,12 +1214,12 @@ fn test2() {
         let test_finder = CodeFinder::new(&test_context).unwrap();
 
         assert_eq!(
-            process_references::<NextReferenceIdProcessor, u32, u32, u32>(
+            process_references::<NextReferenceIdProcessor, u32, (u32, usize), (u32, usize)>(
                 &test_context,
                 None,
                 &test_finder
             ),
-            Some(11)
+            Some((11, 0))
         );
     }
 
@@ -1192,7 +1266,14 @@ fn test2() {
 
         File::create(&source_file_path).unwrap();
         let file_contents = String::new();
-        let test_entries: Vec<parser::LogRefEntry> = Vec::new();
+        let mut test_entries: Vec<parser::LogRefEntry> = Vec::new();
+        
+        {
+            let code_pos = parser::CodePosition::new(30, 2, 18);
+            let entry =
+                parser::LogRefEntry::new(code_pos, None, String::from_str("test_macro").unwrap());
+            test_entries.push(entry);
+        }
 
         let insert_result =
             InsertReferencesProcessor::map(&source_file_path, &file_contents, &None, &test_entries)
