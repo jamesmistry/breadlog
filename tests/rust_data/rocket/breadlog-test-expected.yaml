@@ -1,0 +1,108 @@
+---
+'rocket/core/http/src/tls/listener.rs':
+  - line: 189
+    char: 41
+
+'rocket/core/http/src/listener.rs':
+  - line: 178
+    char: 36
+  - line: 186
+    char: 32
+  - line: 189
+    char: 32
+'rocket/core/lib/src/rocket.rs':
+  - line: 256
+    char: 25
+  - line: 264
+    char: 20
+  - line: 462
+    char: 21
+  - line: 559
+    char: 20
+'rocket/core/lib/src/server.rs':
+  - line: 102
+    char: 24
+  - line: 198
+    char: 32
+  - line: 200
+    char: 33
+  - line: 205
+    char: 24
+  - line: 252
+    char: 16
+  - line: 452
+    char: 28
+  - line: 474
+    char: 32
+  - line: 476
+    char: 32
+  - line: 558
+    char: 24
+  - line: 570
+    char: 36
+  - line: 579
+    char: 40
+  - line: 583
+    char: 40
+  - line: 589
+    char: 32
+  - line: 597
+    char: 32
+  - line: 601
+    char: 32
+'rocket/core/lib/src/response/redirect.rs':
+  - line: 161
+    char: 21
+'rocket/core/lib/src/local/asynchronous/request.rs':
+  - line: 87
+    char: 25
+'rocket/core/lib/src/error.rs':
+  - line: 176
+    char: 25
+  - line: 181
+    char: 25
+  - line: 189
+    char: 29
+  - line: 202
+    char: 25
+  - line: 210
+    char: 25
+  - line: 220
+    char: 25
+  - line: 230
+    char: 25
+'rocket/core/lib/src/fs/server.rs':
+  - line: 150
+    char: 25
+  - line: 155
+    char: 25
+'rocket/core/lib/src/shield/shield.rs':
+  - line: 210
+    char: 20
+  - line: 229
+    char: 24
+'rocket/core/lib/src/fairing/ad_hoc.rs':
+  - line: 391
+    char: 28
+'rocket/core/lib/src/config/config.rs':
+  - line: 434
+    char: 24
+  - line: 450
+    char: 24
+  - line: 463
+    char: 24
+  - line: 597
+    char: 13
+'rocket/core/lib/src/config/shutdown.rs':
+  - line: 325
+    char: 34
+  - line: 341
+    char: 41
+'rocket/core/lib/src/state.rs':
+  - line: 215
+    char: 21
+'rocket/core/lib/src/request/request.rs':
+  - line: 1011
+    char: 28
+  - line: 1060
+    char: 28

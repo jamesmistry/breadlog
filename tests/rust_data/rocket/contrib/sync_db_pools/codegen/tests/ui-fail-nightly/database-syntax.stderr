@@ -1,0 +1,57 @@
+error: unexpected end of input, expected string literal
+  --> tests/ui-fail-nightly/database-syntax.rs:27:1
+   |
+27 | #[database]
+   | ^^^^^^^^^^^
+   |
+   = note: this error originates in the attribute macro `database` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error: expected string literal
+  --> tests/ui-fail-nightly/database-syntax.rs:30:12
+   |
+30 | #[database(1)]
+   |            ^
+
+error: expected string literal
+  --> tests/ui-fail-nightly/database-syntax.rs:33:12
+   |
+33 | #[database(123)]
+   |            ^^^
+
+error: unexpected token
+  --> tests/ui-fail-nightly/database-syntax.rs:36:20
+   |
+36 | #[database("hello" "hi")]
+   |                    ^^^^
+
+error: `database` attribute can only be used on structs
+  --> tests/ui-fail-nightly/database-syntax.rs:40:1
+   |
+40 | enum Foo {  }
+   | ^^^^^^^^^^^^^
+
+error: `database` attribute can only be applied to structs with exactly one unnamed field
+  --> tests/ui-fail-nightly/database-syntax.rs:43:11
+   |
+43 | struct Bar(Connection, Connection);
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^
+   |
+   = help: example: `struct MyDatabase(diesel::SqliteConnection);`
+
+error: `database` attribute can only be used on structs
+  --> tests/ui-fail-nightly/database-syntax.rs:46:1
+   |
+46 | union Baz {  }
+   | ^^^^^^^^^^^^^^
+
+error: `database` attribute cannot be applied to structs with generics
+  --> tests/ui-fail-nightly/database-syntax.rs:49:9
+   |
+49 | struct E<'r>(&'r str);
+   |         ^^^^
+
+error: `database` attribute cannot be applied to structs with generics
+  --> tests/ui-fail-nightly/database-syntax.rs:52:9
+   |
+52 | struct F<T>(T);
+   |         ^^^

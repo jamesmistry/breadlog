@@ -1,0 +1,14 @@
+[workspace]
+resolver = "2"
+members = [
+  "core/lib/",
+  "core/codegen/",
+  "core/http/",
+  "contrib/db_pools/codegen/",
+  "contrib/db_pools/lib/",
+  "contrib/sync_db_pools/codegen/",
+  "contrib/sync_db_pools/lib/",
+  "contrib/dyn_templates/",
+  "contrib/ws/",
+  "site/tests",
+]
