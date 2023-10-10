@@ -5,8 +5,8 @@ use crate::config::Context;
 use crate::parser;
 use async_trait::async_trait;
 use log::error;
-use log::warn;
 use log::info;
+use log::warn;
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
@@ -91,14 +91,11 @@ impl Drop for AsyncTempFile
     {
         use std::fs::remove_file;
 
-        match remove_file(&self.path)
-        {
-            Ok(_) => (),
-            /* The client may have performed a file operation which means it can't be deleted, so 
-               don't worry about errors.
-            */
-            Err(_) => (),
-        }
+        /* The client may have performed a file operation which means it can't be deleted, so
+         * don't worry about errors.
+         */
+        if remove_file(&self.path).is_ok()
+        {}
     }
 }
 
@@ -143,12 +140,7 @@ impl ReferenceProcessor<u32, (u32, usize), (u32, usize)> for NextReferenceIdProc
             }
         }
 
-        if max_file_ref > 0
-        {
-            return Some((max_file_ref, num_missing_refs));
-        }
-
-        None
+        return Some((max_file_ref, num_missing_refs));
     }
 
     fn reduce(map_results: &[(u32, usize)]) -> Option<(u32, usize)>
@@ -260,7 +252,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
         entries: &[parser::LogRefEntry],
     ) -> Option<InsertReferencesResult>
     {
-        if entries.iter().filter(|&e|!e.exists()).count() == 0
+        if entries.iter().filter(|&e| !e.exists()).count() == 0
         {
             return Some(InsertReferencesResult {
                 failure: false,
@@ -551,16 +543,14 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 
         info!("Found {} file(s)", finder.code_files.len());
 
-        let references_id_result = match process_references::<
-                NextReferenceIdProcessor,
-                u32,
-                (u32, usize),
-                (u32, usize),
-            >(context, None, &finder)
-        {
-            Some(r) => r,
-            None => return Err("Failed to determine next reference ID"),
-        };
+        let references_id_result =
+            match process_references::<NextReferenceIdProcessor, u32, (u32, usize), (u32, usize)>(
+                context, None, &finder,
+            )
+            {
+                Some(r) => r,
+                None => return Err("Failed to determine next reference ID"),
+            };
 
         if references_id_result.1 == 0
         {
@@ -568,21 +558,28 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
             return Ok(0);
         }
 
-        let next_reference_id =
-            Arc::new(AtomicU32::new(references_id_result.0));
+        let next_reference_id = Arc::new(AtomicU32::new(references_id_result.0));
 
-        info!("Next reference ID: {}", next_reference_id.load(std::sync::atomic::Ordering::Relaxed));
+        info!(
+            "Next reference ID: {}",
+            next_reference_id.load(std::sync::atomic::Ordering::Relaxed)
+        );
 
-        match process_references::<
-                InsertReferencesProcessor,
-                Arc<AtomicU32>,
-                InsertReferencesResult,
-                InsertReferencesResult,
-            >(context, Some(next_reference_id), &finder)
+        let reference_updates = match process_references::<
+            InsertReferencesProcessor,
+            Arc<AtomicU32>,
+            InsertReferencesResult,
+            InsertReferencesResult,
+        >(context, Some(next_reference_id), &finder)
         {
             Some(r) => r,
             None => return Err("Failed to insert references"),
         };
+
+        info!(
+            "Num. inserted reference(s): {}",
+            reference_updates.num_inserted_references
+        );
     }
     else
     {
@@ -694,7 +691,7 @@ rust:
         )
         .await;
 
-        assert_eq!(map_result, None);
+        assert_eq!(map_result, Some((0, 0)));
     }
 
     #[test_log::test(async_std::test)]
@@ -724,7 +721,7 @@ rust:
         )
         .await;
 
-        assert_eq!(map_result, None);
+        assert_eq!(map_result, Some((0, 2)));
     }
 
     #[test_log::test(async_std::test)]
@@ -775,8 +772,7 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 1, 1);
-            let entry =
-                parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
             test_entries.push(entry);
         }
 
@@ -789,8 +785,7 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry =
-                parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
             test_entries.push(entry);
         }
 
@@ -1267,7 +1262,7 @@ fn test2() {
         File::create(&source_file_path).unwrap();
         let file_contents = String::new();
         let mut test_entries: Vec<parser::LogRefEntry> = Vec::new();
-        
+
         {
             let code_pos = parser::CodePosition::new(30, 2, 18);
             let entry =
