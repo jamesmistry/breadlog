@@ -78,7 +78,10 @@ fn main() -> Result<(), u32>
     const INIT_ERR_CODE: u32 = 1;
     const CODE_GEN_ERR_CODE: u32 = 2;
 
-    SimpleLogger::new().with_level(LevelFilter::Info).init().unwrap();
+    SimpleLogger::new()
+        .with_level(LevelFilter::Info)
+        .init()
+        .unwrap();
 
     let args = ProgArgs::parse();
 
