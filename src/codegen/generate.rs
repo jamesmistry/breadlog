@@ -543,22 +543,40 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 
         info!("Found {} file(s)", finder.code_files.len());
 
-        let references_id_result =
-            match process_references::<NextReferenceIdProcessor, u32, (u32, usize), (u32, usize)>(
-                context, None, &finder,
-            )
-            {
-                Some(r) => r,
-                None => return Err("Failed to determine next reference ID"),
-            };
-
-        if references_id_result.1 == 0
+        let calculated_next_reference_id = match context.cached_next_reference_id
         {
-            info!("No missing references - nothing to do");
-            return Ok(0);
-        }
+            Some(id) =>
+            {
+                info!("Using cached next reference ID");
 
-        let next_reference_id = Arc::new(AtomicU32::new(references_id_result.0));
+                id
+            },
+            None =>
+            {
+                info!("Performing first pass to determine next reference ID");
+
+                let references_id_result = match process_references::<
+                    NextReferenceIdProcessor,
+                    u32,
+                    (u32, usize),
+                    (u32, usize),
+                >(context, None, &finder)
+                {
+                    Some(r) => r,
+                    None => return Err("Failed to determine next reference ID"),
+                };
+
+                if references_id_result.1 == 0
+                {
+                    info!("No missing references - nothing to do");
+                    return Ok(0);
+                }
+
+                references_id_result.0
+            },
+        };
+
+        let next_reference_id = Arc::new(AtomicU32::new(calculated_next_reference_id));
 
         info!(
             "Next reference ID: {}",
@@ -575,6 +593,10 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
             Some(r) => r,
             None => return Err("Failed to insert references"),
         };
+
+        let cachable_reference_id =
+            calculated_next_reference_id + (reference_updates.num_inserted_references as u32) + 1;
+        context.cache_next_reference_id(cachable_reference_id, context.config.config_dir.as_str());
 
         info!(
             "Num. inserted reference(s): {}",
@@ -594,6 +616,7 @@ mod tests
 {
     use async_trait::async_trait;
     use futures::AsyncWriteExt;
+    use regex::Regex;
     use std::fs::File;
     use std::io::Read;
     use std::io::Write;
@@ -602,6 +625,7 @@ mod tests
     extern crate testing_logger;
     use tracing_test::traced_test;
 
+    use super::generate_code;
     use super::process_references;
     use super::CountMissingReferenceIdProcessor;
     use super::InsertReferencesProcessor;
@@ -664,7 +688,7 @@ rust:
                 source_dir
             )
             .to_string(),
-            &"/tmp".to_string(),
+            &source_dir,
             check_mode,
         )
         .unwrap();
@@ -1743,5 +1767,173 @@ fn test1() {
         }
 
         assert_eq!(async_std::fs::metadata(temp_file_path).await.is_ok(), false);
+    }
+
+    #[test]
+    fn test_generate_no_cache()
+    {
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+
+        let source_file_path_1: String;
+        let source_file_path_2: String;
+
+        {
+            source_file_path_1 = temp_dir
+                .path()
+                .join("test_file1.rs")
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let mut source_file = File::create(&source_file_path_1).unwrap();
+            source_file
+                .write_all(
+                    br#"
+fn test1() {
+    test_macro!("Log test.");
+}
+            "#,
+                )
+                .unwrap();
+        }
+
+        {
+            source_file_path_2 = temp_dir
+                .path()
+                .join("test_file2.rs")
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let mut source_file = File::create(&source_file_path_2).unwrap();
+            source_file
+                .write_all(
+                    br#"
+fn test2() {
+    test_macro!("Log test.");
+}
+            "#,
+                )
+                .unwrap();
+        }
+
+        assert!(generate_code(&test_context).is_ok());
+
+        let file_1_contents = std::fs::read_to_string(&source_file_path_1).unwrap();
+        let file_2_contents = std::fs::read_to_string(&source_file_path_2).unwrap();
+
+        let ref_pattern = Regex::new(r"\[ref: ([0-9]{1,10})\]").unwrap();
+
+        let file_1_match = ref_pattern
+            .captures_iter(file_1_contents.as_str())
+            .next()
+            .unwrap();
+        let file_2_match = ref_pattern
+            .captures_iter(file_2_contents.as_str())
+            .next()
+            .unwrap();
+
+        let file_1_id = file_1_match[1].parse::<u32>().unwrap();
+        let file_2_id = file_2_match[1].parse::<u32>().unwrap();
+
+        assert!(file_1_id != file_2_id);
+        assert!(file_1_id == 1 || file_1_id == 2);
+        assert!(file_2_id == 1 || file_2_id == 2);
+    }
+
+    #[test]
+    fn test_generate_uses_cache()
+    {
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+
+        {
+            let cache_file_path = temp_dir
+                .path()
+                .join("Breadlog.lock")
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let mut cache_file = File::create(&cache_file_path).unwrap();
+            cache_file
+                .write_all(
+                    br#"
+---
+next_reference_id: 123
+            "#,
+                )
+                .unwrap();
+        }
+
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+
+        let source_file_path_1: String;
+        let source_file_path_2: String;
+
+        {
+            source_file_path_1 = temp_dir
+                .path()
+                .join("test_file1.rs")
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let mut source_file = File::create(&source_file_path_1).unwrap();
+            source_file
+                .write_all(
+                    br#"
+fn test1() {
+    test_macro!("Log test.");
+}
+            "#,
+                )
+                .unwrap();
+        }
+
+        {
+            source_file_path_2 = temp_dir
+                .path()
+                .join("test_file2.rs")
+                .to_str()
+                .unwrap()
+                .to_string();
+
+            let mut source_file = File::create(&source_file_path_2).unwrap();
+            source_file
+                .write_all(
+                    br#"
+fn test2() {
+    test_macro!("Log test.");
+}
+            "#,
+                )
+                .unwrap();
+        }
+
+        assert!(generate_code(&test_context).is_ok());
+
+        let file_1_contents = std::fs::read_to_string(&source_file_path_1).unwrap();
+        let file_2_contents = std::fs::read_to_string(&source_file_path_2).unwrap();
+
+        let ref_pattern = Regex::new(r"\[ref: ([0-9]{1,10})\]").unwrap();
+
+        let file_1_match = ref_pattern
+            .captures_iter(file_1_contents.as_str())
+            .next()
+            .unwrap();
+        let file_2_match = ref_pattern
+            .captures_iter(file_2_contents.as_str())
+            .next()
+            .unwrap();
+
+        let file_1_id = file_1_match[1].parse::<u32>().unwrap();
+        let file_2_id = file_2_match[1].parse::<u32>().unwrap();
+
+        assert!(file_1_id != file_2_id);
+        assert!(file_1_id == 123 || file_1_id == 124);
+        assert!(file_2_id == 123 || file_2_id == 124);
     }
 }

@@ -158,8 +158,6 @@ fn test_check()
         .filter_map(|e| e.ok())
         .filter(|e| e.file_type().is_file())
     {
-        use md5::{Digest, Md5};
-
         if entry.path().extension().is_none()
         {
             continue;
@@ -187,21 +185,15 @@ fn test_check()
             .collect::<String>();
 
         let canonical_file_contents = std::fs::read_to_string(entry.path()).unwrap();
-        let mut canonical_hasher = Md5::new();
-        canonical_hasher.update(canonical_file_contents);
-        let canonical_hash = format!("{:x}", canonical_hasher.finalize());
 
         let test_file_path = temp_dir
             .path()
             .join("rust_data")
             .join(relative_path.clone());
         let test_file_contents = std::fs::read_to_string(test_file_path).unwrap();
-        let mut test_hasher = Md5::new();
-        test_hasher.update(test_file_contents);
-        let test_hash = format!("{:x}", test_hasher.finalize());
 
-        assert!(
-            canonical_hash == test_hash,
+        assert_eq!(
+            canonical_file_contents, test_file_contents,
             "File {} appears to have been modified but should not have been while in check mode",
             relative_path
         );
@@ -235,15 +227,17 @@ fn test_codegen()
         .unwrap()
         .to_string();
 
+    let cache_filename = temp_dir.path().join("rust_data/rocket/Breadlog.lock");
+
     let output = test_bin::get_test_bin("breadlog")
         .args(["--config", &config_filename])
         .output()
         .unwrap();
 
-    assert_eq!(output.status.success(), true);
+    assert!(output.status.success());
+    assert!(cache_filename.exists());
 
     let command_stdout = String::from_utf8(output.stdout).unwrap();
-    print!("{}", command_stdout);
 
     assert!(command_stdout.contains("Num. inserted reference(s): 46"));
 

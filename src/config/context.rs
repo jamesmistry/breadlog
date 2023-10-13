@@ -28,19 +28,32 @@ pub struct Config
 
     pub source_dir: String,
 
+    #[serde(default = "default_use_cache")]
+    pub use_cache: bool,
+
     #[serde(default)]
     pub rust: RustConfig,
+}
+
+#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+pub struct Cache
+{
+    pub next_reference_id: u32,
 }
 
 pub struct Context
 {
     pub config: Config,
+    pub cached_next_reference_id: Option<u32>,
     pub check_mode: bool,
     pub stop_commanded: Arc<atomic::AtomicBool>,
 }
 
 impl Context
 {
+    const CACHE_FILENAME: &str = "Breadlog.lock";
+    const CACHE_EDIT_WARNING: &str = "# AUTO-GENERATED FILE - DON'T EDIT\n# If you would like to recalculate the next reference from your code, delete this file and\n# run Breadlog.\n\n";
+
     pub fn new(yaml: String, config_dir: &str, check_mode: bool) -> Result<Self, String>
     {
         match serde_yaml::from_str(&yaml)
@@ -49,8 +62,12 @@ impl Context
             {
                 use std::path;
 
+                let next_reference_id =
+                    Context::read_cached_next_reference_id(&loaded_config, config_dir);
+
                 let mut loaded_context = Self {
                     config: loaded_config,
+                    cached_next_reference_id: next_reference_id,
                     check_mode,
                     stop_commanded: Arc::new(atomic::AtomicBool::new(false)),
                 };
@@ -85,6 +102,74 @@ impl Context
             Err(e) => Err(e.to_string()),
         }
     }
+
+    fn read_cached_next_reference_id(config: &Config, directory_path: &str) -> Option<u32>
+    {
+        let cache_path = std::path::Path::new(directory_path).join(Context::CACHE_FILENAME);
+
+        if !config.use_cache || !cache_path.exists()
+        {
+            return None;
+        }
+
+        if let Ok(cache_yaml) = std::fs::read_to_string(cache_path)
+        {
+            match serde_yaml::from_str::<Cache>(cache_yaml.as_str())
+            {
+                Ok(loaded_cache) => Some(loaded_cache.next_reference_id),
+                Err(e) =>
+                {
+                    log::warn!(
+                        "Failed to parse lock file {}: {}",
+                        Context::CACHE_FILENAME,
+                        e
+                    );
+                    None
+                },
+            }
+        }
+        else
+        {
+            log::warn!("Failed to read lock file {}", Context::CACHE_FILENAME);
+            None
+        }
+    }
+
+    pub fn cache_next_reference_id(&self, id: u32, directory_path: &str)
+    {
+        if !self.config.use_cache
+        {
+            return;
+        }
+
+        let cache_path = std::path::Path::new(directory_path).join(Context::CACHE_FILENAME);
+
+        let cache = Cache {
+            next_reference_id: id,
+        };
+
+        match serde_yaml::to_string(&cache)
+        {
+            Ok(mut yaml) =>
+            {
+                yaml.insert_str(0, Context::CACHE_EDIT_WARNING);
+
+                if let Err(e) = std::fs::write(cache_path, yaml)
+                {
+                    log::warn!(
+                        "Failed to write lock file {}: {}",
+                        Context::CACHE_FILENAME,
+                        e
+                    );
+                }
+            },
+            Err(e) => log::warn!(
+                "Failed to serialize lock file {}: {}",
+                Context::CACHE_FILENAME,
+                e
+            ),
+        }
+    }
 }
 
 fn default_rust_extensions() -> Vec<String>
@@ -92,10 +177,17 @@ fn default_rust_extensions() -> Vec<String>
     vec!["rs".to_string()]
 }
 
+fn default_use_cache() -> bool
+{
+    true
+}
+
 #[cfg(test)]
 mod tests
 {
     use super::Context;
+
+    use tempdir::TempDir;
 
     #[test]
     fn test_invalid_config()
@@ -171,5 +263,145 @@ mod tests
             subject.unwrap().config.source_dir,
             "/tmp/test/dir".to_string()
         );
+    }
+
+    #[test]
+    fn test_cache_load_no_cache()
+    {
+        let test_input = r#"
+        source_dir: test/dir
+        rust:
+          log_macros:
+            - module: test_module
+              name: test_macro
+        "#;
+
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let temp_dir_str = temp_dir.path().to_str().unwrap();
+
+        let subject = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+
+        assert!(subject.cached_next_reference_id.is_none());
+    }
+
+    #[test]
+    fn test_cache_load_valid_cache()
+    {
+        let test_input = r#"
+        source_dir: test/dir
+        rust:
+          log_macros:
+            - module: test_module
+              name: test_macro
+        "#;
+
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let cache_file = temp_dir.path().join(Context::CACHE_FILENAME);
+        std::fs::write(cache_file, "---\nnext_reference_id: 123\n").unwrap();
+
+        let temp_dir_str = temp_dir.path().to_str().unwrap();
+
+        let subject = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+
+        assert_eq!(subject.cached_next_reference_id, Some(123));
+    }
+
+    #[test]
+    fn test_cache_load_invalid_cache()
+    {
+        let test_input = r#"
+        source_dir: test/dir
+        rust:
+          log_macros:
+            - module: test_module
+              name: test_macro
+        "#;
+
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let cache_file = temp_dir.path().join(Context::CACHE_FILENAME);
+        std::fs::write(cache_file, "/\\/ Invalid YAML /\\/").unwrap();
+
+        let temp_dir_str = temp_dir.path().to_str().unwrap();
+
+        let subject = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+
+        assert!(subject.cached_next_reference_id.is_none());
+    }
+
+    #[test]
+    fn test_cache_disabled_read()
+    {
+        let test_input = r#"
+        source_dir: test/dir
+        use_cache: false
+        rust:
+          log_macros:
+            - module: test_module
+              name: test_macro
+        "#;
+
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let cache_file = temp_dir.path().join(Context::CACHE_FILENAME);
+        std::fs::write(cache_file, "---\nnext_reference_id: 123\n").unwrap();
+
+        let temp_dir_str = temp_dir.path().to_str().unwrap();
+
+        let subject = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+
+        assert!(subject.cached_next_reference_id.is_none());
+    }
+
+    #[test]
+    fn test_cache_write()
+    {
+        let test_input = r#"
+        source_dir: test/dir
+        rust:
+          log_macros:
+            - module: test_module
+              name: test_macro
+        "#;
+
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let temp_dir_str = temp_dir.path().to_str().unwrap();
+        let cache_file = temp_dir.path().join(Context::CACHE_FILENAME);
+
+        {
+            let ctx = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+            ctx.cache_next_reference_id(123, temp_dir.path().to_str().unwrap());
+        }
+
+        let cache_file_contents = std::fs::read_to_string(cache_file).unwrap();
+        assert!(cache_file_contents.starts_with(Context::CACHE_EDIT_WARNING));
+
+        let subject = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+        assert_eq!(subject.cached_next_reference_id, Some(123));
+    }
+
+    #[test]
+    fn test_cache_disabled_write()
+    {
+        let test_input = r#"
+        source_dir: test/dir
+        use_cache: false
+        rust:
+          log_macros:
+            - module: test_module
+              name: test_macro
+        "#;
+
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let temp_dir_str = temp_dir.path().to_str().unwrap();
+        let cache_file = temp_dir.path().join(Context::CACHE_FILENAME);
+
+        {
+            let ctx = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+            ctx.cache_next_reference_id(123, temp_dir.path().to_str().unwrap());
+        }
+
+        assert_eq!(cache_file.exists(), false);
+
+        let subject = Context::new(test_input.to_string(), temp_dir_str, true).unwrap();
+        assert_eq!(subject.cached_next_reference_id, None);
     }
 }
