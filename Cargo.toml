@@ -5,12 +5,16 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[[bin]]
+name = "breadlog"
+path = "src/main.rs"
+
 [dependencies]
 pest = {version = "2.6.0" }
 pest_derive = "2.6.0"
-serde_yaml = "0.8.26"
+serde_yaml = "0.9"
 serde = { version = "1.0.140", features = ["derive"] }
-clap = { version = "3.2.15", features = ["derive"] }
+clap = { version = "4.4.6", features = ["derive"] }
 log = "0.4.17"
 simple_logger = "2.2.0"
 tempfile = "3.3.0"
@@ -26,6 +30,7 @@ testing_logger = "0.1.1"
 uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
 async-trait = "0.1.71"
 tracing = "0.1"
+value-bag = "1.4.1"
 
 [dev-dependencies]
 env_logger = "0.10.0"

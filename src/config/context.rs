@@ -52,6 +52,8 @@ pub struct Context
 impl Context
 {
     const CACHE_FILENAME: &'static str = "Breadlog.lock";
+
+    #[allow(dead_code)]
     const CACHE_EDIT_WARNING: &'static str = "# AUTO-GENERATED FILE - DON'T EDIT\n# If you would like to recalculate the next reference from your code, delete this file and\n# run Breadlog.\n\n";
 
     pub fn new(yaml: String, config_dir: &str, check_mode: bool) -> Result<Self, String>
@@ -135,6 +137,7 @@ impl Context
         }
     }
 
+    #[allow(dead_code)]
     pub fn cache_next_reference_id(&self, id: u32, directory_path: &str)
     {
         if !self.config.use_cache

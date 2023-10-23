@@ -13,7 +13,7 @@ jobs:
     - name: Setup | Rust
       run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
     - name: Setup | Rust Nightly
-      run: "rustup install nightly"
+      run: "rustup install nightly && rustup default nightly"
     - name: Setup | Code Formatter
       run: "rustup update && rustup component add rustfmt"
     - name: Setup | Linter
@@ -35,7 +35,7 @@ jobs:
     - name: Setup | Rust
       run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
     - name: Setup | Rust Nightly
-      run: "rustup install nightly"
+      run: "rustup install nightly && rustup default nightly"
     - name: Setup | LLVM Tooling
       run: "rustup component add llvm-tools-preview"
     - name: Setup | LLVM helper
