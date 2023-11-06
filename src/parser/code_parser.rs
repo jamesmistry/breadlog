@@ -5,28 +5,52 @@ use std::vec::Vec;
 use super::rust_parser::rust_log_ref_finder;
 use crate::config::Config;
 
+/// Represents a position in the source code.
 #[derive(Copy, Clone)]
 pub struct CodePosition
 {
+    /// The 0-based character offset from the start of the source code.
     character: usize,
+
+    /// The 1-based line number in the source code.
     line: usize,
+
+    /// The 1-based column number in the source code.
     column: usize,
 }
 
+/// Represents a log reference in the source code.
 #[derive(Clone)]
 pub struct LogRefEntry
 {
+    /// The position of the log reference in the source code.
     position: CodePosition,
+
+    /// The numeric reference associated with the log message, if one exists.
     reference: Option<u32>,
+
+    /// The name of the macro used to log the message.
     _macro_name: String,
 }
 
+/// Represents a programming language.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub enum CodeLanguage
 {
     Rust = 0,
 }
 
+/// Finds log references in source code.
+///
+/// # Arguments
+///
+/// * `language` - The programming language of the source code.
+/// * `code` - The source code to search for log references.
+/// * `config` - The configuration to use when searching for log references.
+///
+/// # Returns
+///
+/// A vector of log references found in the source code.
 pub fn find_references(language: CodeLanguage, code: &str, config: &Config) -> Vec<LogRefEntry>
 {
     match language
@@ -35,8 +59,16 @@ pub fn find_references(language: CodeLanguage, code: &str, config: &Config) -> V
     }
 }
 
+/// Returns the programming language of the source code.
 impl CodePosition
 {
+    /// Creates a new CodePosition.
+    ///
+    /// # Arguments
+    ///
+    /// * `character` - The 0-based character offset from the start of the source code.
+    /// * `line` - The 1-based line number in the source code.
+    /// * `column` - The 1-based column number in the source code.
     pub fn new(character: usize, line: usize, column: usize) -> CodePosition
     {
         CodePosition {
@@ -46,16 +78,19 @@ impl CodePosition
         }
     }
 
+    /// Returns the 0-based character offset from the start of the source code.
     pub fn character(&self) -> usize
     {
         self.character
     }
 
+    /// Returns the 1-based line number in the source code.
     pub fn line(&self) -> usize
     {
         self.line
     }
 
+    /// Returns the 1-based column number in the source code.
     pub fn column(&self) -> usize
     {
         self.column
@@ -64,6 +99,13 @@ impl CodePosition
 
 impl LogRefEntry
 {
+    /// Creates a new LogRefEntry.
+    ///
+    /// # Arguments
+    ///
+    /// * `position` - The position of the log reference in the source code.
+    /// * `reference` - The numeric reference associated with the log message, if one exists.
+    /// * `_macro_name` - The name of the macro used to log the message.
     pub fn new(position: CodePosition, reference: Option<u32>, _macro_name: String) -> LogRefEntry
     {
         LogRefEntry {

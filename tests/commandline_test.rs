@@ -10,6 +10,7 @@ use tempdir::TempDir;
 use test_bin;
 use walkdir::WalkDir;
 
+/// Represents the position of a change in a line-based file.
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 struct LineChange
 {
@@ -17,14 +18,30 @@ struct LineChange
     pub char: usize,
 }
 
+/// Represents the expected changes to a file.
 type ExpectedChanges = BTreeMap<String, Vec<LineChange>>;
 
+/// Load and return the expected changes from the given YAML file.
+///
+/// # Arguments
+///
+/// * `expected_changes_filename` - The path to the YAML file containing the expected changes.
+///
 fn load_expected_changes(expected_changes_filename: &String) -> ExpectedChanges
 {
     let expected_changes_yaml = std::fs::read_to_string(expected_changes_filename).unwrap();
     serde_yaml::from_str::<ExpectedChanges>(&expected_changes_yaml).unwrap()
 }
 
+/// Check that the given file has been modified as expected.
+///
+/// # Arguments
+///
+/// * `file_path` - The path to the file to check.
+/// * `file_contents` - The contents of the file to check.
+/// * `expected_line_changes` - The expected changes to the file.
+/// * `all_ids` - A mutable reference to a vector containing all reference IDs found in the file, populated by this function.
+///
 fn check_modified_file(
     file_path: &String,
     file_contents: &String,
@@ -64,6 +81,12 @@ fn check_modified_file(
     }
 }
 
+/// Check that the given reference IDs are contiguous and unique.
+///
+/// # Arguments
+///
+/// * `all_ids` - A vector containing all reference IDs found in the file.
+///
 fn check_ids_contiguous_and_no_duplicates(all_ids: &Vec<usize>)
 {
     let mut sorted_ids = all_ids.clone();

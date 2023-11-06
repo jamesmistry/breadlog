@@ -8,10 +8,21 @@ use std::str::FromStr;
 #[grammar = "parser/rust_grammar.pest"]
 struct RustParser;
 
+/// Finds all log references in the given code.
 pub mod rust_log_ref_finder
 {
     use super::*;
 
+    /// Finds all log references in the given code.
+    ///
+    /// # Arguments
+    ///
+    /// * `code` - The source code to search for log references.
+    /// * `config` - The configuration to use when searching for log references.
+    ///
+    /// # Returns
+    ///
+    /// A vector of log references found in the source code.
     pub fn find(code: &str, config: &Config) -> Vec<LogRefEntry>
     {
         let mut result = Vec::new();

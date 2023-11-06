@@ -14,6 +14,7 @@ use std::fs;
 const ERR_CODE_CONFIG_READ: u32 = 1;
 const ERR_CODE_CONFIG_LOAD: u32 = 2;
 
+/// Command-line arguments for the program.
 #[derive(Parser, Debug)]
 #[clap(name = "Breadlog")]
 #[clap(author = "James Mistry")]
@@ -29,6 +30,13 @@ struct ProgArgs
     check: bool,
 }
 
+/// Set up and return the application context. This includes reading the configuration file and parsing it.
+///
+/// # Arguments
+///
+/// * `config_filename` - The path to the configuration file.
+/// * `check_mode` - Whether to run in check mode or not.
+///
 fn setup_context(config_filename: &String, check_mode: bool) -> Result<config::Context, u32>
 {
     let config_contents = fs::read_to_string(config_filename);

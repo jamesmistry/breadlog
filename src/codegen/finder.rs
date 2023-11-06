@@ -7,28 +7,47 @@ use log::{error, warn};
 use std::fs::metadata;
 use walkdir::WalkDir;
 
+/// Represents a single code file.
 pub struct CodeFile
 {
+    /// The path to the file.
     pub path: String,
+
+    /// The language contained in the file.
     pub language: CodeLanguage,
 }
 
 impl CodeFile
 {
+    /// Create a new `CodeFile` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file.
+    /// * `language` - The language contained in the file.
     pub fn new(path: String, language: CodeLanguage) -> CodeFile
     {
         Self { path, language }
     }
 }
 
+/// Represents a collection of code files.
 pub struct CodeFinder<'ctx>
 {
+    /// The list of code files.
     pub code_files: Vec<CodeFile>,
+
+    /// A reference to the `Context` instance.
     context: &'ctx Context,
 }
 
 impl<'ctx> CodeFinder<'ctx>
 {
+    /// Create a new `CodeFinder` instance.
+    ///
+    /// # Arguments
+    ///
+    /// * `context` - A reference to the `Context` instance.
     pub fn new(context: &'ctx Context) -> Option<CodeFinder<'ctx>>
     {
         let mut result = Self {
@@ -46,6 +65,11 @@ impl<'ctx> CodeFinder<'ctx>
         }
     }
 
+    /// Find all code files in the configured source directory.
+    ///
+    /// # Returns
+    ///
+    /// `true` if the search was successful, `false` otherwise.
     pub fn find(&mut self) -> bool
     {
         /*

@@ -14,6 +14,15 @@ use tracing;
 
 const START_REFERENCE_ID: u32 = 1;
 
+/// Load the contents of the file at the given path.
+///
+/// # Arguments
+///
+/// * `path` - The path to the file to load.
+///
+/// # Returns
+///
+/// The contents of the file, or `None` if the file could not be read.
 async fn load_code(path: &String) -> Option<String>
 {
     match async_std::fs::read_to_string(path).await
@@ -32,14 +41,23 @@ async fn load_code(path: &String) -> Option<String>
     }
 }
 
+/// Represents a temporary file which is deleted when dropped; compatible with `async_std::fs::File`.
 struct AsyncTempFile
 {
+    /// The path to the temporary file.
     path: String,
+
+    /// The file handle.
     file: async_std::fs::File,
 }
 
 impl AsyncTempFile
 {
+    /// Create a new temporary file.
+    ///
+    /// # Returns
+    ///
+    /// The temporary file, or an error message if the file could not be created.
     pub async fn new() -> Result<AsyncTempFile, String>
     {
         use std::env::temp_dir;
@@ -74,19 +92,23 @@ impl AsyncTempFile
         }
     }
 
+    /// Get the path to the temporary file.
     pub fn path(&self) -> &str
     {
         &self.path
     }
 
+    /// Get a mutable reference to the file handle.
     pub fn file(&mut self) -> &mut async_std::fs::File
     {
         &mut self.file
     }
 }
 
+/// Delete the temporary file when dropped.
 impl Drop for AsyncTempFile
 {
+    /// Delete the temporary file.
     fn drop(&mut self)
     {
         use std::fs::remove_file;
@@ -99,20 +121,57 @@ impl Drop for AsyncTempFile
     }
 }
 
+/// Represents a processor which can be used to find references in multiple files concurrently. As with
+/// all reference processors, the map and reduce operations are orchestrated by `process_references()`.
+///
+/// # Type Parameters
+///
+/// * `Params` - The type of the parameters to pass to the processor.
+/// * `MapResult` - The type of the result of the map operation.
+/// * `ReduceResult` - The type of the result of the reduce operation.
 #[async_trait]
 pub trait ReferenceProcessor<Params, MapResult, ReduceResult>
 {
+    /// Find references in the given file.
+    ///
+    /// # Arguments
+    ///
+    /// * `path` - The path to the file to process.
+    /// * `file_contents` - The contents of the file to process.
+    /// * `params` - Any parameters to pass to the processor.
+    /// * `entries` - The log reference entries found in the file.
+    ///
+    /// # Returns
+    ///
+    /// The result of the map operation, or `None` if the operation failed.
     async fn map(
         path: &str,
         file_contents: &str,
         params: &Option<Params>,
         entries: &[parser::LogRefEntry],
     ) -> Option<MapResult>;
+
+    /// Reduce the results of the map operation.
+    ///
+    /// # Arguments
+    ///
+    /// * `map_result` - The results of the map operation.
+    ///
+    /// # Returns
+    ///
+    /// The result of the reduce operation, or `None` if the operation failed.
     fn reduce(map_result: &[MapResult]) -> Option<ReduceResult>;
 }
 
+/// A reference processor for determining the next available contiguous reference ID in a code base. As with
+/// all reference processors, the map and reduce operations are orchestrated by `process_references()`.
 struct NextReferenceIdProcessor {}
 
+/// # Type Parameters
+///
+/// * `Params` - The type of the parameters to pass to the processor.
+/// * `MapResult` - The type of the result of the map operation.
+/// * `ReduceResult` - The type of the result of the reduce operation.
 #[async_trait]
 impl ReferenceProcessor<u32, (u32, usize), (u32, usize)> for NextReferenceIdProcessor
 {
@@ -165,8 +224,15 @@ impl ReferenceProcessor<u32, (u32, usize), (u32, usize)> for NextReferenceIdProc
     }
 }
 
+/// A reference processor for counting the number of missing references in a code base. As with
+/// all reference processors, the map and reduce operations are orchestrated by `process_references()`.
 struct CountMissingReferenceIdProcessor {}
 
+/// # Type Parameters
+///
+/// * `Params` - The type of the parameters to pass to the processor.
+/// * `MapResult` - The type of the result of the map operation.
+/// * `ReduceResult` - The type of the result of the reduce operation.
 #[async_trait]
 impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
 {
@@ -233,14 +299,22 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
     }
 }
 
+/// The result of inserting references into a file.
 struct InsertReferencesResult
 {
     failure: bool,
     num_inserted_references: usize,
 }
 
+/// A reference processor for inserting references into a code base. As with
+/// all reference processors, the map and reduce operations are orchestrated by `process_references()`.
 struct InsertReferencesProcessor {}
 
+/// # Type Parameters
+///
+/// * `Params` - The type of the parameters to pass to the processor.
+/// * `MapResult` - The type of the result of the map operation.
+/// * `ReduceResult` - The type of the result of the reduce operation.
 #[async_trait]
 impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferencesResult>
     for InsertReferencesProcessor
@@ -445,6 +519,17 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
     }
 }
 
+/// Process references in the given code base.
+///
+/// # Arguments
+///
+/// * `context` - The context to use.
+/// * `params` - Any parameters to pass to the processor.
+/// * `finder` - The code finder to use.
+///
+/// # Returns
+///
+/// The result of the relevant processor's reduce operation, or `None` if the operation failed.
 fn process_references<
     'generator,
     ProcessorType,
@@ -502,6 +587,15 @@ where
     })
 }
 
+/// Check the given code base for missing references.
+///
+/// # Arguments
+///
+/// * `context` - Application context.
+///
+/// # Returns
+///
+/// Number of missing references found, otherwise an error message on failure.
 pub fn check_references(context: &Context) -> Result<u32, &'static str>
 {
     if let Some(finder) = CodeFinder::new(context)
@@ -532,6 +626,15 @@ pub fn check_references(context: &Context) -> Result<u32, &'static str>
     Ok(0)
 }
 
+/// Insert log references in the given code base.
+///
+/// # Arguments
+///
+/// * `context` - Application context.
+///
+/// # Returns
+///
+/// Number of inserted references, otherwise an error message on failure.
 pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 {
     if let Some(finder) = CodeFinder::new(context)
