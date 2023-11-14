@@ -2,7 +2,28 @@
 name: build-and-test
 on: [push]
 jobs:
+  set-vars:
+    name: "Set workflow variables"
+    runs-on: ubuntu-latest
+    outputs:
+      release_tag: ${{ steps.check_tag.outputs.match }}
+    steps:
+    - name: Determine release tag
+      id: check_tag
+      run: |
+       echo "event.ref: ${{ github.event.ref }}"
+       echo "ref_name:  ${{ github.ref_name }}"
+       echo "ref:       ${{ github.ref }}"
+       if [[ ${{ github.event.ref }} =~ ^refs/tags/v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+         echo "match=true" >> $GITHUB_OUTPUT
+         echo "Setting check_tag to true"
+       else
+         echo "match=false" >> $GITHUB_OUTPUT
+         echo "Setting check_tag to false"
+       fi
+
   static-analysis:
+    needs: set-vars
     name: Run static analysis
     runs-on: ubuntu-latest
     steps:
@@ -24,7 +45,7 @@ jobs:
       run: "cargo clippy -- -D warnings"
 
   build:
-    needs: static-analysis
+    needs: [static-analysis, set-vars]
     name: Build and run tests
     runs-on: ubuntu-latest
     steps:
@@ -64,3 +85,54 @@ jobs:
         name: breadlog-release
         path: target/release/breadlog
         retention-days: 7
+    - name: Build package | App
+      run: 'BREADLOG_TMP="$(mktemp -d)"; mkdir -p "${BREADLOG_TMP}/usr/bin" && cp target/release/breadlog "${BREADLOG_TMP}/usr/bin/breadlog" && tar -C "${BREADLOG_TMP}" -czf /tmp/breadlog_package.tar.gz usr'
+    - name: Upload package artifact | App
+      uses: actions/upload-artifact@v3
+      with:
+        name: breadlog-package
+        path: /tmp/breadlog_package.tar.gz
+
+  upload-assets:
+    # This job will only run on a release tag, which will have been created by
+    # release-please along with a GitHub release. A GitHub release associated
+    # with the tag is therefore guaranteed to exist before this job runs,
+    # providing a location to upload the release artifacts.
+    #
+    # Note that there is a race condition between this workflow being triggered
+    # by release-please pushing a tag and creating the GH release, but given the 
+    # other jobs in the workflow it is safe to assume a GH release will have 
+    # been created in time.
+    #
+    # 2 packages with identical content but different names are uploaded: one
+    # is for manual download and contains the release version in the name 
+    # while the other is for downloading from within user CI pipelines and
+    # doesn't contain the release version in the name. This allows CI pipelines
+    # to easily download the latest package from a single, consistent URL.
+    needs: [set-vars, build]
+    env:
+      USER_PACKAGE_NAME: "/tmp/breadlog-package-${{ github.ref_name }}.tar.gz"
+      CI_PACKAGE_NAME: "/tmp/breadlog-package.tar.gz"
+      PACKAGE_HASH_NAME: "/tmp/breadlog-package.sha256"
+    name: Upload assets | Release
+    if: needs.set-vars.outputs.release_tag == 'true'
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/download-artifact@v3
+      with:
+        name: breadlog-package
+    - name: Store package hash | Release
+      run: 'sha256sum /tmp/breadlog_package.tar.gz > "${PACKAGE_HASH_NAME}"'
+    - name: Create user package | Release
+      run: 'cp "/tmp/breadlog_package.tar.gz" "${USER_PACKAGE_NAME}"'
+    - name: Create CI package | Release
+      run: 'cp "/tmp/breadlog_package.tar.gz" "${CI_PACKAGE_NAME}"'
+    - name: Auth GH CLI | Release
+      run: 'echo "${{ secrets.BREADLOG_RELEASE_PAT }}" | gh auth login --with-token'
+    - name: Upload user release artifact | Release
+      run: 'gh release upload "${{github.ref_name}}" "${USER_PACKAGE_NAME}#Installer archive"'
+    - name: Upload CI release artifact | Release
+      run: 'gh release upload "${{github.ref_name}}" "${CI_PACKAGE_NAME}"'
+    - name: Upload package hash | Release
+      run: 'gh release upload "${{github.ref_name}}" "${PACKAGE_HASH_NAME}#Installer hash"'
+
