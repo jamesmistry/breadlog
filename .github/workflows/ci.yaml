@@ -122,11 +122,11 @@ jobs:
       with:
         name: breadlog-package
     - name: Store package hash | Release
-      run: 'sha256sum /tmp/breadlog_package.tar.gz > "${PACKAGE_HASH_NAME}"'
+      run: 'sha256sum ./breadlog_package.tar.gz > "${PACKAGE_HASH_NAME}"'
     - name: Create user package | Release
-      run: 'cp "/tmp/breadlog_package.tar.gz" "${USER_PACKAGE_NAME}"'
+      run: 'cp "./breadlog_package.tar.gz" "${USER_PACKAGE_NAME}"'
     - name: Create CI package | Release
-      run: 'cp "/tmp/breadlog_package.tar.gz" "${CI_PACKAGE_NAME}"'
+      run: 'cp "./breadlog_package.tar.gz" "${CI_PACKAGE_NAME}"'
     - name: Auth GH CLI | Release
       run: 'echo "${{ secrets.BREADLOG_RELEASE_PAT }}" | gh auth login --with-token'
     - name: Upload user release artifact | Release
