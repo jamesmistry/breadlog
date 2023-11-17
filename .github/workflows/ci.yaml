@@ -124,7 +124,7 @@ jobs:
       with:
         name: breadlog-package
     - name: Store package hash | Release
-      run: 'sha256sum ./breadlog_package.tar.gz > "${PACKAGE_HASH_NAME}"'
+      run: 'sha256sum ./breadlog_package.tar.gz | cut -d ' ' -f 1 > "${PACKAGE_HASH_NAME}"'
     - name: Create user package | Release
       run: 'cp "./breadlog_package.tar.gz" "${USER_PACKAGE_NAME}"'
     - name: Create CI package | Release
