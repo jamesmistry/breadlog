@@ -118,6 +118,8 @@ jobs:
     if: needs.set-vars.outputs.release_tag == 'true'
     runs-on: ubuntu-latest
     steps:
+    - name: Checkout
+      uses: actions/checkout@v3
     - uses: actions/download-artifact@v3
       with:
         name: breadlog-package
