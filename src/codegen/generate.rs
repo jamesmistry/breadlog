@@ -698,7 +698,7 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
         };
 
         let cachable_reference_id =
-            calculated_next_reference_id + (reference_updates.num_inserted_references as u32) + 1;
+            calculated_next_reference_id + (reference_updates.num_inserted_references as u32);
         context.cache_next_reference_id(cachable_reference_id, context.config.config_dir.as_str());
 
         info!(
@@ -1949,16 +1949,18 @@ fn test2() {
     #[test]
     fn test_generate_uses_cache()
     {
+        use std::collections::BTreeMap;
+
         let temp_dir = TempDir::new("breadlog_test").unwrap();
 
-        {
-            let cache_file_path = temp_dir
-                .path()
-                .join("Breadlog.lock")
-                .to_str()
-                .unwrap()
-                .to_string();
+        let cache_file_path = temp_dir
+            .path()
+            .join("Breadlog.lock")
+            .to_str()
+            .unwrap()
+            .to_string();
 
+        {
             let mut cache_file = File::create(&cache_file_path).unwrap();
             cache_file
                 .write_all(
@@ -2020,6 +2022,7 @@ fn test2() {
 
         let file_1_contents = std::fs::read_to_string(&source_file_path_1).unwrap();
         let file_2_contents = std::fs::read_to_string(&source_file_path_2).unwrap();
+        let cache_contents = std::fs::read_to_string(&cache_file_path).unwrap();
 
         let ref_pattern = Regex::new(r"\[ref: ([0-9]{1,10})\]").unwrap();
 
@@ -2038,5 +2041,9 @@ fn test2() {
         assert!(file_1_id != file_2_id);
         assert!(file_1_id == 123 || file_1_id == 124);
         assert!(file_2_id == 123 || file_2_id == 124);
+
+        let loaded_cache: BTreeMap<String, u32> =
+            serde_yaml::from_str(cache_contents.as_str()).unwrap();
+        assert_eq!(loaded_cache["next_reference_id"], 125);
     }
 }
