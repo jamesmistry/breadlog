@@ -32,7 +32,7 @@ async fn load_code(path: &String) -> Option<String>
         {
             let path_copy = path.clone();
             task::spawn(async move {
-                error!("Failed to read file {}: {}", path_copy, e);
+                error!("[ref: 4] Failed to read file {}: {}", path_copy, e);
             })
             .await;
 
@@ -257,7 +257,7 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
 
                 task::spawn(async move {
                     warn!(
-                        "Missing reference in file {}, line {}, column {}",
+                        "[ref: 5] Missing reference in file {}, line {}, column {}",
                         path_copy, line, column,
                     );
                 })
@@ -275,7 +275,7 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
         let path_copy = path.to_string();
         task::spawn(async move {
             info!(
-                "Total missing references in {}: {}",
+                "[ref: 6] Total missing references in {}: {}",
                 path_copy, missing_ref_count
             );
         })
@@ -293,7 +293,10 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
             reduce_result += *map_result;
         }
 
-        info!("Total missing references (all files): {}", reduce_result);
+        info!(
+            "[ref: 7] Total missing references (all files): {}",
+            reduce_result
+        );
 
         Some(reduce_result)
     }
@@ -342,7 +345,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             None =>
             {
                 task::spawn(async {
-                    error!("Unexpected missing next reference ID during reference insert");
+                    error!("[ref: 8] Unexpected missing next reference ID during reference insert");
                 })
                 .await;
 
@@ -366,7 +369,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             Err(e) =>
             {
                 task::spawn(async move {
-                    error!("{}", e);
+                    error!("[ref: 9] {}", e);
                 })
                 .await;
 
@@ -387,7 +390,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             {
                 task::spawn(async move {
                     error!(
-                        "Unexpected reference insert position {} before cursor position {}",
+                        "[ref: 10] Unexpected reference insert position {} before cursor position {}",
                         insert_pos, unwritten_content_start_pos,
                     );
                 })
@@ -410,7 +413,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
                 Err(e) =>
                 {
                     task::spawn(async move {
-                        error!("Failed to write to temporary file: {}", e);
+                        error!("[ref: 11] Failed to write to temporary file: {}", e);
                     })
                     .await;
 
@@ -435,7 +438,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
                 Err(e) =>
                 {
                     task::spawn(async move {
-                        error!("Failed to write to temporary file: {}", e);
+                        error!("[ref: 12] Failed to write to temporary file: {}", e);
                     })
                     .await;
 
@@ -463,7 +466,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
                 Err(e) =>
                 {
                     task::spawn(async move {
-                        error!("Failed to write to temporary file: {}", e);
+                        error!("[ref: 13] Failed to write to temporary file: {}", e);
                     })
                     .await;
 
@@ -487,7 +490,7 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             Err(e) =>
             {
                 task::spawn(async move {
-                    error!("Failed to rename temporary file: {}", e);
+                    error!("[ref: 14] Failed to rename temporary file: {}", e);
                 })
                 .await;
 
@@ -605,7 +608,7 @@ pub fn check_references(context: &Context) -> Result<u32, &'static str>
             return Err("No files found");
         }
 
-        info!("Found {} file(s)", finder.code_files.len());
+        info!("[ref: 15] Found {} file(s)", finder.code_files.len());
 
         let missing_reference_count =
             process_references::<CountMissingReferenceIdProcessor, u32, u32, u32>(
@@ -644,19 +647,19 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
             return Err("No files found");
         }
 
-        info!("Found {} file(s)", finder.code_files.len());
+        info!("[ref: 16] Found {} file(s)", finder.code_files.len());
 
         let calculated_next_reference_id = match context.cached_next_reference_id
         {
             Some(id) =>
             {
-                info!("Using cached next reference ID");
+                info!("[ref: 17] Using cached next reference ID");
 
                 id
             },
             None =>
             {
-                info!("Performing first pass to determine next reference ID");
+                info!("[ref: 18] Performing first pass to determine next reference ID");
 
                 let references_id_result = match process_references::<
                     NextReferenceIdProcessor,
@@ -671,7 +674,7 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
 
                 if references_id_result.1 == 0
                 {
-                    info!("No missing references - nothing to do");
+                    info!("[ref: 19] No missing references - nothing to do");
                     return Ok(0);
                 }
 
@@ -682,7 +685,7 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
         let next_reference_id = Arc::new(AtomicU32::new(calculated_next_reference_id));
 
         info!(
-            "Next reference ID: {}",
+            "[ref: 20] Next reference ID: {}",
             next_reference_id.load(std::sync::atomic::Ordering::Relaxed)
         );
 
@@ -702,7 +705,7 @@ pub fn generate_code(context: &Context) -> Result<u32, &'static str>
         context.cache_next_reference_id(cachable_reference_id, context.config.config_dir.as_str());
 
         info!(
-            "Num. inserted reference(s): {}",
+            "[ref: 21] Num. inserted reference(s): {}",
             reference_updates.num_inserted_references
         );
     }
