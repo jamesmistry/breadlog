@@ -161,7 +161,7 @@ impl Context
                 Err(e) =>
                 {
                     log::warn!(
-                        "Failed to parse lock file {}: {}",
+                        "[ref: 31] Failed to parse lock file {}: {}",
                         Context::CACHE_FILENAME,
                         e
                     );
@@ -171,7 +171,10 @@ impl Context
         }
         else
         {
-            log::warn!("Failed to read lock file {}", Context::CACHE_FILENAME);
+            log::warn!(
+                "[ref: 32] Failed to read lock file {}",
+                Context::CACHE_FILENAME
+            );
             None
         }
     }
@@ -205,14 +208,14 @@ impl Context
                 if let Err(e) = std::fs::write(cache_path, yaml)
                 {
                     log::warn!(
-                        "Failed to write lock file {}: {}",
+                        "[ref: 33] Failed to write lock file {}: {}",
                         Context::CACHE_FILENAME,
                         e
                     );
                 }
             },
             Err(e) => log::warn!(
-                "Failed to serialize lock file {}: {}",
+                "[ref: 34] Failed to serialize lock file {}: {}",
                 Context::CACHE_FILENAME,
                 e
             ),
