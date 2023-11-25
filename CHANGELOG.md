@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.1](https://github.com/jamesmistry/breadlog/compare/v0.2.0...v0.2.1) (2023-11-25)
+
+
+### Bug Fixes
+
+* Include arch in release asset names ([8bbac04](https://github.com/jamesmistry/breadlog/commit/8bbac04e051ebf67c30ea728b11c3fcab3d91a16))
+
 ## [0.2.0](https://github.com/jamesmistry/breadlog/compare/v0.1.0...v0.2.0) (2023-11-21)
 
 
