@@ -18,7 +18,7 @@ const ERR_CODE_CONFIG_LOAD: u32 = 2;
 #[derive(Parser, Debug)]
 #[clap(name = "Breadlog")]
 #[clap(author = "James Mistry")]
-#[clap(about = "Maintain unique references to log messages in source code.", long_about = None)]
+#[clap(about = "Maintain unique references to log messages in source code.", version, long_about = None)]
 struct ProgArgs
 {
     #[clap(short, long, value_parser)]
