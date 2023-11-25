@@ -41,13 +41,16 @@ fn setup_context(config_filename: &String, check_mode: bool) -> Result<config::C
 {
     let config_contents = fs::read_to_string(config_filename);
 
-    info!("Reading configuration file: {}", config_filename);
+    info!("[ref: 22] Reading configuration file: {}", config_filename);
 
     let app_ctx = match config_contents
     {
         Err(e) =>
         {
-            error!("Failed to read configuration file: {}", e.to_string());
+            error!(
+                "[ref: 23] Failed to read configuration file: {}",
+                e.to_string()
+            );
             return Err(ERR_CODE_CONFIG_READ);
         },
 
@@ -67,13 +70,13 @@ fn setup_context(config_filename: &String, check_mode: bool) -> Result<config::C
     {
         Err(e) =>
         {
-            error!("Failed to load YAML: {}", e);
+            error!("[ref: 24] Failed to load YAML: {}", e);
             Err(ERR_CODE_CONFIG_LOAD)
         },
 
         Ok(ctx) =>
         {
-            info!("Configuration loaded!");
+            info!("[ref: 25] Configuration loaded!");
             Ok(ctx)
         },
     }
@@ -110,27 +113,27 @@ fn main() -> Result<(), u32>
     )
     .is_err()
     {
-        error!("Failed to register signal handler");
+        error!("[ref: 26] Failed to register signal handler");
         return Err(INIT_ERR_CODE);
     }
 
     if app_context.check_mode
     {
-        info!("Running in check mode");
+        info!("[ref: 27] Running in check mode");
 
         if let Err(err) = codegen::generate::check_references(&app_context)
         {
-            error!("Failed: {}", err);
+            error!("[ref: 28] Failed: {}", err);
             return Err(CODE_GEN_ERR_CODE);
         }
     }
     else
     {
-        info!("Running in code generation mode");
+        info!("[ref: 29] Running in code generation mode");
 
         if let Err(err) = codegen::generate::generate_code(&app_context)
         {
-            error!("Failed: {}", err);
+            error!("[ref: 30] Failed: {}", err);
             return Err(CODE_GEN_ERR_CODE);
         }
     }

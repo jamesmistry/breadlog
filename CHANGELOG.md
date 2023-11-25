@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.0](https://github.com/jamesmistry/breadlog/compare/v0.1.0...v0.2.0) (2023-11-21)
+
+
+### Features
+
+* Add reference IDs to log messages ([1fd2d74](https://github.com/jamesmistry/breadlog/commit/1fd2d7461b2c163f2bc57a344d555de78140baca))
+
+
+### Bug Fixes
+
+* Correct off-by-one bug in reference cache ([6aa6dc3](https://github.com/jamesmistry/breadlog/commit/6aa6dc359d9c9f7184909c49254f15df0f687dfe))
+
 ## 0.1.0 (2023-11-17)
 
 

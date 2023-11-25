@@ -111,9 +111,9 @@ jobs:
     # to easily download the latest package from a single, consistent URL.
     needs: [set-vars, build]
     env:
-      USER_PACKAGE_NAME: "/tmp/breadlog-package-${{ github.ref_name }}.tar.gz"
-      CI_PACKAGE_NAME: "/tmp/breadlog-package.tar.gz"
-      PACKAGE_HASH_NAME: "/tmp/breadlog-package.sha256"
+      USER_PACKAGE_NAME: "/tmp/breadlog-package-${{ github.ref_name }}-linux_x86-64.tar.gz"
+      CI_PACKAGE_NAME: "/tmp/breadlog-package-linux_x86-64.tar.gz"
+      PACKAGE_HASH_NAME: "/tmp/breadlog-package-linux_x86-64.sha256"
     name: Upload assets | Release
     if: needs.set-vars.outputs.release_tag == 'true'
     runs-on: ubuntu-latest
@@ -132,9 +132,9 @@ jobs:
     - name: Auth GH CLI | Release
       run: 'echo "${{ secrets.BREADLOG_RELEASE_PAT }}" | gh auth login --with-token'
     - name: Upload user release artifact | Release
-      run: 'gh release upload "${{github.ref_name}}" "${USER_PACKAGE_NAME}#Installer archive"'
+      run: 'gh release upload "${{github.ref_name}}" "${USER_PACKAGE_NAME}#Installer archive (Linux x86-64)"'
     - name: Upload CI release artifact | Release
       run: 'gh release upload "${{github.ref_name}}" "${CI_PACKAGE_NAME}"'
     - name: Upload package hash | Release
-      run: 'gh release upload "${{github.ref_name}}" "${PACKAGE_HASH_NAME}#Installer hash"'
+      run: 'gh release upload "${{github.ref_name}}" "${PACKAGE_HASH_NAME}#Installer hash (Linux x86-64)"'
 

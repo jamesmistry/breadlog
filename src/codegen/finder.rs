@@ -88,14 +88,14 @@ impl<'ctx> CodeFinder<'ctx>
             Ok(metadata) => metadata,
             Err(_e) =>
             {
-                error!("Failed to read source directory metadata");
+                error!("[ref: 1] Failed to read source directory metadata");
                 return false;
             },
         };
 
         if !source_dir_metadata.is_dir()
         {
-            error!("Configured source path is not a directory");
+            error!("[ref: 2] Configured source path is not a directory");
             return false;
         }
 
@@ -120,7 +120,7 @@ impl<'ctx> CodeFinder<'ctx>
                     Ok(extension) => extension.to_string(),
                     Err(_e) =>
                     {
-                        warn!("{}", _e);
+                        warn!("[ref: 3] {}", _e);
                         continue;
                     },
                 };
