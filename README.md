@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/jamesmistry/breadlog/actions/workflows/ci.yaml/badge.svg)
 
-*User Guide: PLACEHOLDER*
+For documentation about using Breadlog, see the [User Guide](https://breadlog.readthedocs.io/en/latest/).
 
 ## Overview
 
@@ -13,7 +13,7 @@ This helps you identify application events from log messages using a numerical
 ID that stays the same even when log message content changes. No brittle or 
 complex text parsing required.
 
-## Installing Breadlog
+## Installing/Upgrading Breadlog
 
 > [!NOTE]  
 > Breadlog only supports Linux x86-64 targets at the moment.
@@ -29,14 +29,14 @@ complex text parsing required.
 4. Test your installation by running Breadlog:
 
    ```bash
-   $ breadlog --help
+   $ breadlog --version
    ```
 
-See the [User Guide]() for how to get started.
+See the [User Guide](https://breadlog.readthedocs.io/en/latest/) for how to get started.
 
 ## Using Breadlog
 
-See the [User Guide]().
+See the [User Guide](https://breadlog.readthedocs.io/en/latest/).
 
 ## Building Breadlog
 
