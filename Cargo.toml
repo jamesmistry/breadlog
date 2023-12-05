@@ -16,7 +16,7 @@ serde_yaml = "0.9"
 serde = { version = "1.0.140", features = ["derive"] }
 clap = { version = "4.4.6", features = ["derive"] }
 log = "0.4.17"
-simple_logger = "2.2.0"
+simple_logger = "4.3.0"
 tempfile = "3.3.0"
 futures = "0.3"
 async-std = { version = "1.12.0", features = ["attributes"] }
@@ -24,7 +24,6 @@ regex = "1.10.0"
 lazy_static = "1.4.0"
 test-log = "0.2.11"
 walkdir = "2"
-tempdir = "0.3.7"
 signal-hook = "0.3.15"
 testing_logger = "0.1.1"
 uuid = { version = "1.4.1", features = ["v4", "fast-rng", "macro-diagnostics"] }
@@ -33,8 +32,9 @@ tracing = "0.1"
 value-bag = "1.4.1"
 
 [dev-dependencies]
-env_logger = "0.10.0"
+env_logger = "0.10.1"
 tracing-test = "0.2"
 test_bin = "0.4"
 copy_dir = "0.1"
 regex = "1.10.0"
+tempdir = "0.3.7"
