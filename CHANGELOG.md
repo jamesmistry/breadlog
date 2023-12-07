@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.2](https://github.com/jamesmistry/breadlog/compare/v0.2.1...v0.2.2) (2023-12-07)
+
+
+### Miscellaneous Chores
+
+* release 0.2.2 ([06ea123](https://github.com/jamesmistry/breadlog/commit/06ea123daa306b723ccb6cdd006c5af0171357f3))
+
 ## [0.2.1](https://github.com/jamesmistry/breadlog/compare/v0.2.0...v0.2.1) (2023-11-25)
 
 
