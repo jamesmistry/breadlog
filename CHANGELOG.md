@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.3.0](https://github.com/jamesmistry/breadlog/compare/v0.2.2...v0.3.0) (2023-12-10)
+
+
+### Features
+
+* Reduce glibc requirement to 2.31+ ([952baa2](https://github.com/jamesmistry/breadlog/commit/952baa2b5faf8933101abf27f5b57283a91097ba))
+
 ## [0.2.2](https://github.com/jamesmistry/breadlog/compare/v0.2.1...v0.2.2) (2023-12-07)
 
 
