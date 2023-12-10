@@ -39,7 +39,7 @@ First, download and install the latest Breadlog release:
 
 .. code-block:: bash
 
-   sudo curl --proto "=https" -sSf "https://github.com/jamesmistry/breadlog/releases/download/latest/breadlog-package-linux_x86-64.tar.gz" | tar -xz -C /
+   curl --proto "=https" -LsSf "https://github.com/jamesmistry/breadlog/releases/latest/download/breadlog-package-linux_x86-64.tar.gz" | sudo tar -xz -C /
 
 Second, run Breadlog in check mode. This command will exit with a non-zero code
 if missing log reference IDs are found:

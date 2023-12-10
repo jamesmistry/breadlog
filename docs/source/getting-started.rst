@@ -5,7 +5,7 @@ Step 1: Installing/Upgrading Breadlog
 -------------------------------------
 
 .. note::
-    Breadlog only supports Linux x86-64 targets at the moment.
+    Breadlog only supports Linux x86-64 targets with glibc 2.31+ at the moment.
 
 1. Go to the `list of Breadlog releases <https://github.com/jamesmistry/breadlog/releases>`_.
 2. Download the Installer Archive for the release you want to install (probably                         

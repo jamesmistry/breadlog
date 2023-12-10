@@ -26,11 +26,17 @@ jobs:
     needs: set-vars
     name: Run static analysis
     runs-on: ubuntu-latest
+    env:
+      BREADLOG_PKG_URL: "https://github.com/jamesmistry/breadlog/releases/latest/download/breadlog-package-linux_x86-64.tar.gz"
     steps:
     - name: Setup | Checkout
       uses: actions/checkout@v3
     - name: Setup | Prerequisites
       run: "sudo bash -c 'apt update && DEBIAN_FRONTEND=noninteractive apt install -y curl'"
+#    - name: Setup | Breadlog
+#      run: 'curl --proto "=https" -LsSf "${BREADLOG_PKG_URL}" | sudo tar -xz -C /'
+#    - name: Breadlog Check | App
+#      run: "breadlog -c ./Breadlog.yaml --check"
     - name: Setup | Rust
       run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
     - name: Setup | Rust Nightly
@@ -47,7 +53,8 @@ jobs:
   build:
     needs: [static-analysis, set-vars]
     name: Build and run tests
-    runs-on: ubuntu-latest
+    # Provides glibc 2.31
+    runs-on: ubuntu-20.04
     steps:
     - name: Setup | Checkout
       uses: actions/checkout@v3
