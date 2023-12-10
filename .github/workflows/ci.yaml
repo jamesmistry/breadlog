@@ -33,10 +33,10 @@ jobs:
       uses: actions/checkout@v3
     - name: Setup | Prerequisites
       run: "sudo bash -c 'apt update && DEBIAN_FRONTEND=noninteractive apt install -y curl'"
-#    - name: Setup | Breadlog
-#      run: 'curl --proto "=https" -LsSf "${BREADLOG_PKG_URL}" | sudo tar -xz -C /'
-#    - name: Breadlog Check | App
-#      run: "breadlog -c ./Breadlog.yaml --check"
+    - name: Setup | Breadlog
+      run: 'curl --proto "=https" -LsSf "${BREADLOG_PKG_URL}" | sudo tar -xz -C /'
+    - name: Breadlog Check | App
+      run: "breadlog -c ./Breadlog.yaml --check"
     - name: Setup | Rust
       run: "curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y"
     - name: Setup | Rust Nightly
