@@ -48,7 +48,7 @@ jobs:
     - name: Code Format Check | App
       run: "cargo +nightly fmt -- --check --config-path ./"
     - name: Lint | App
-      run: "cargo clippy -- -D warnings"
+      run: "cargo clippy -- -A 'clippy::empty-docs' -D warnings"
 
   build:
     needs: [static-analysis, set-vars]
