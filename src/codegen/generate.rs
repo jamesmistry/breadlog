@@ -10,7 +10,6 @@ use log::warn;
 use std::str::FromStr;
 use std::sync::atomic::AtomicU32;
 use std::sync::Arc;
-use tracing;
 
 const START_REFERENCE_ID: u32 = 1;
 

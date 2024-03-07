@@ -1,6 +1,5 @@
 use lazy_static::lazy_static;
 use regex::Regex;
-use std::vec::Vec;
 
 use super::rust_parser::rust_log_ref_finder;
 use crate::config::Config;

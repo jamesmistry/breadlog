@@ -1,5 +1,3 @@
-use std::option::Option;
-
 use crate::config::Context;
 
 use crate::parser::code_parser::CodeLanguage;

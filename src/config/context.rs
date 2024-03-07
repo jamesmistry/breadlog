@@ -1,5 +1,4 @@
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 use std::str::FromStr;
 use std::sync::atomic;
 use std::sync::Arc;
