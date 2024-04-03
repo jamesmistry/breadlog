@@ -472,4 +472,184 @@ rust:
         assert_eq!(found_macros.len(), 1);
         assert_eq!(found_macros[0].reference(), None);
     }
+
+    #[test]
+    fn test_grammar_kvp_args_single_kvp_no_target()
+    {
+        let test_data = "test_macro!(a = 1; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 20);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 21);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_args_single_kvp_target()
+    {
+        let test_data = "test_macro!(target: \"test target\", a = 1; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 43);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 44);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_args_multi_kvp_no_target()
+    {
+        let test_data = "test_macro!(a = 1, b = 2; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 27);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 28);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_args_multi_kvp_target()
+    {
+        let test_data = "test_macro!(target: \"test target\", a = 1, b = 2; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 50);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 51);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_modifier_single_char()
+    {
+        let test_data = "test_macro!(a:? = 1; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 22);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 23);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_modifier_multi_char()
+    {
+        let test_data = "test_macro!(a:debug = 1; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 26);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 27);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_termination_with_literal_semicolon()
+    {
+        let test_data = "test_macro!(a = \"Test string 1;\"; \"Test string 2.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 35);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 36);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_termination_with_multi_kv_literal_semicolons()
+    {
+        let test_data = "test_macro!(a = \"Test string 1;\", b = \"Test string 2;\"; \"Test string 3.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 57);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 58);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_multi_string_in_value()
+    {
+        let test_data = "test_macro!(a = \"Test string 1\".cmp(\"Test string 2\"); \"Test string 3.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 55);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 56);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_single_no_assignment()
+    {
+        let test_data = "test_macro!(a; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 16);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 17);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_multi_no_assignment()
+    {
+        let test_data = "test_macro!(a, b; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 19);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 20);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_grammar_kvp_multi_assignment_mix()
+    {
+        let test_data = "test_macro!(a = 1, b; \"Test string.\")\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro");
+        assert_eq!(found_macros[0].position().character(), 23);
+        assert_eq!(found_macros[0].position().line(), 1);
+        assert_eq!(found_macros[0].position().column(), 24);
+        assert_eq!(found_macros[0].reference(), None);
+    }
 }
