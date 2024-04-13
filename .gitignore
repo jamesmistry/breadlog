@@ -2,3 +2,4 @@
 *.profdata
 *.profraw
 *.swp
+/small_test_coverage_report.txt
