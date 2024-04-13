@@ -57,12 +57,15 @@ pub struct Context
     pub config: Config,
 
     /// The next reference ID to use, if read from a lock file.
+    #[allow(dead_code)]
     pub cached_next_reference_id: Option<u32>,
 
     /// Whether or not to only check the existence of references in log messages, rather than insert references in code.
+    #[allow(dead_code)]
     pub check_mode: bool,
 
     /// Whether or not there's a pending exit request (e.g. from an signal).
+    #[allow(dead_code)]
     pub stop_commanded: Arc<atomic::AtomicBool>,
 }
 
