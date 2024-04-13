@@ -581,7 +581,8 @@ rust:
     #[test]
     fn test_grammar_kvp_termination_with_multi_kv_literal_semicolons()
     {
-        let test_data = "test_macro!(a = \"Test string 1;\", b = \"Test string 2;\"; \"Test string 3.\")\n";
+        let test_data =
+            "test_macro!(a = \"Test string 1;\", b = \"Test string 2;\"; \"Test string 3.\")\n";
 
         let found_macros = apply_grammar_to_string(test_data);
 
@@ -596,7 +597,8 @@ rust:
     #[test]
     fn test_grammar_kvp_multi_string_in_value()
     {
-        let test_data = "test_macro!(a = \"Test string 1\".cmp(\"Test string 2\"); \"Test string 3.\")\n";
+        let test_data =
+            "test_macro!(a = \"Test string 1\".cmp(\"Test string 2\"); \"Test string 3.\")\n";
 
         let found_macros = apply_grammar_to_string(test_data);
 
