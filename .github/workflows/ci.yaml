@@ -69,9 +69,9 @@ jobs:
     - name: Setup | LLVM helper
       run: "cargo install cargo-binutils && rustup component add llvm-tools-preview"
     - name: Tests | App
-      run: './.github/workflows/test_with_coverage.bash "$(pwd)"' #&> ./small_test_coverage_report.txt && cat ./small_test_coverage_report.txt'
+      run: './.github/workflows/test_with_coverage.bash "$(pwd)" &> ./small_test_coverage_report.txt && cat ./small_test_coverage_report.txt'
     - name: Clean artifacts from test | App
-      run: 'rm ./target/*'
+      run: 'rm -rf ./target/*'
     - name: Create build environment | App
       run: "docker build --file build.Dockerfile -t breadlog:build ./"
     - name: Build | App
