@@ -15,19 +15,23 @@ complex text parsing required.
 
 ## Installing/Upgrading Breadlog
 
-1. Go to the [list of Breadlog releases](https://github.com/jamesmistry/breadlog/releases).
-2. Download the Installer Archive for the release you want to install (probably 
-   the latest).
-3. Install Breadlog by extracting the archive (you may need to `sudo`):
+Install the latest version of Breadlog with the following command:
 
-   ```bash
-   # tar -xz -C / -f breadlog-package-vX.Y.Z-linux_x86-64.tar.gz
-   ```
-4. Test your installation by running Breadlog:
+```bash
+curl --proto "=https" -LsSf \
+   "https://github.com/jamesmistry/breadlog/releases/latest/download/breadlog-package-linux_x86-64.tar.gz" \
+   | sudo tar -xz -C /
+```
 
-   ```bash
-   $ breadlog --version
-   ```
+Test your installation by running Breadlog:
+
+```bash
+breadlog --version
+```
+
+If you'd like to install a specific version of Breadlog, go to the 
+[list of Breadlog releases](https://github.com/jamesmistry/breadlog/releases).
+
 
 See the [User Guide](https://breadlog.readthedocs.io/en/latest/) for how to get started.
 
@@ -48,18 +52,18 @@ Before building Breadlog, you need to:
 - Install the Rust nightly toolchain:
 
   ```bash
-  $ rustup toolchain install nightly
+  rustup toolchain install nightly
   ```
 - (Optional) Install `rustfmt` and `clippy` (used for code formatting and 
   static analysis, respectively):
 
   ```bash
-  $ rustup update && rustup component add rustfmt clippy
+  rustup update && rustup component add rustfmt clippy
   ```
 - (Optional) Install `cargo-fuzz` (used for fuzz testing):
 
   ```bash
-  $ cargo install cargo-fuzz
+  cargo install cargo-fuzz
   ```
 
 ### Building using Cargo
@@ -69,17 +73,17 @@ Breadlog currently requires nightly Rust features.
 1. Clone the repository and change your working directory:
    
    ```bash
-   $ git clone git@github.com:jamesmistry/breadlog.git && cd breadlog
+   git clone git@github.com:jamesmistry/breadlog.git && cd breadlog
    ```
 2. Make sure the toolchain is up-to-date:
 
    ```bash
-   $ rustup update nightly
+   rustup update nightly
    ```
 3. Build using Cargo:
 
    ```bash
-   $ cargo +nightly build
+   cargo +nightly build
    ```
 4. Find the Breadlog binary in `target/debug/breadlog` or 
    `target/release/breadlog` if creating a release build.
@@ -89,13 +93,13 @@ To build the User Guide using Sphinx:
 1. Install Sphinx if you haven't already:
 
    ```bash
-   $ pip3 install -U sphinx
+   pip3 install -U sphinx sphinx_rtd_theme
    ```
 2. From the repository root run the following command where `<OUTPUT DIR>` is 
    the directory to write the generated HTML:
 
    ```bash
-   $ sphinx-build -M html docs/ <OUTPUT DIR>
+   sphinx-build -M html docs/ <OUTPUT DIR>
    ```
 
 ### Running tests
@@ -105,21 +109,21 @@ To build the User Guide using Sphinx:
 - Run the test suite:
 
   ```bash
-  $ cargo test
+  cargo test
   ```
 - Start a fuzz test:
 
   ```bash
-  $ cargo fuzz run fuzz_rust_parser
+  cargo fuzz run fuzz_rust_parser
   ```
 - Run the code format check:
 
   ```bash
-  $ cargo +nightly fmt -- --check --config-path ./
+  cargo +nightly fmt -- --check --config-path ./
   ```
 - Run the linter:
 
   ```bash
-  $ cargo clippy -- -D warnings
+  cargo clippy -- -D warnings
   ```
 
