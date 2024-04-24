@@ -4,6 +4,10 @@ Getting Started
 Step 1: Installing/Upgrading Breadlog
 -------------------------------------
 
+.. note::
+
+   Breadlog only supports Linux on x86-64 at the moment.
+
 Install the latest version of Breadlog with the following command:
 
 .. code-block:: bash

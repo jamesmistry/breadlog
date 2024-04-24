@@ -15,6 +15,9 @@ complex text parsing required.
 
 ## Installing/Upgrading Breadlog
 
+> [!NOTE]
+> Breadlog only supports Linux on x86-64 at the moment.
+
 Install the latest version of Breadlog with the following command:
 
 ```bash
