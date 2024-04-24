@@ -3,12 +3,13 @@ Known Limitations
 
 Breadlog has several known limitations:
 
-- Rust code parsing does not take into account modules in scope, relying only
-  on identifiers to find log statements.
+- Rust code parsing does not use a full Rust parser, instead conservatively 
+  approximating the parsing of code. For example it doesn't take into account 
+  modules in scope, instead relying only on identifiers to find log statements.
 - Rust code parsing only supports Rust logging macros that follow the 
-  semantics of the `log crate <https://crates.io/crates/log>`_.
-- Rust code parsing does not support `structured key-value pairs 
-  <https://docs.rs/log/latest/log/kv/index.html>`_ used with log macros.
+  semantics of the `log crate <https://crates.io/crates/log>`_, and specifically
+  the level-specific macros (``info!``, ``warn!``, ``error!`` and so on but 
+  not ``log!``).
 - Breadlog does not support specifying check mode exemptions in code (i.e. 
   excluding lines from being checked for the presence of references using 
   in-code annotations).

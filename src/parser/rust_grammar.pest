@@ -3,16 +3,19 @@
 WHITESPACE = _{ "\t" | "\n" | "\u{000B}" | "\u{000C}" | "\r" | " " | "\u{0085}" | "\u{200E}" | "\u{200F}" | "\u{2028}" | "\u{2029}" }
 COMMENT = _{ ("/*" ~ (!"*/" ~ ANY)* ~ "*/") | ("//" ~ (!"\n" ~ ANY)* ~ ("\n")) }
 
+rust_identifier = _{ ((XID_START | "_") ~ (XID_CONTINUE)*) }
 string_value = @{ (!(!"\\"{1} ~ "\"") ~ ANY)* }
 string_literal = { "\"" ~ string_value ~ (!"\\"{1} ~ "\"") }
 silent_string_value = _{ (!(!"\\"{1} ~ "\"") ~ ANY)* }
 silent_string_literal = _{ "\"" ~ silent_string_value ~ (!"\\"{1} ~ "\"") }
 target_arg = _{ ("target:" ~ silent_string_literal ~ ","){0, 1} }
-string_arg = { "(" ~ target_arg ~ string_literal }
+kvp_modifiers = _{ (":" ~ ("?" | "debug" | "%" | "display" | "err" | "sval" | "serde")) }
+kvp_arg = _{ (rust_identifier ~ kvp_modifiers{0, 1} ~ (silent_string_literal | !";" ~ ANY)* ~ ";"){0, 1} }
+string_arg = { "(" ~ target_arg ~ kvp_arg ~ string_literal }
 macro_name = { ((XID_START | "_") ~ (XID_CONTINUE ~ "::"?)*) }
 log_macro = { macro_name ~ "!" ~ string_arg }
 file =
-{ 
+{
     SOI ~
     (log_macro | ANY)* ~
     EOI
