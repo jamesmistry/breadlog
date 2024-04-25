@@ -4,20 +4,26 @@ Getting Started
 Step 1: Installing/Upgrading Breadlog
 -------------------------------------
 
-1. Go to the `list of Breadlog releases <https://github.com/jamesmistry/breadlog/releases>`_.
-2. Download the Installer Archive for the release you want to install (probably                         
-   the latest).
-3. Install Breadlog by extracting the archive (you may need to ``sudo``):
+.. note::
 
-   .. code-block:: bash
+   Breadlog only supports Linux on x86-64 at the moment.
 
-      # tar -xz -C / -f breadlog-package-vX.Y.Z-linux_x86-64.tar.gz
+Install the latest version of Breadlog with the following command:
 
-4. Test your installation by running Breadlog:
+.. code-block:: bash
 
-   .. code-block:: bash
+   curl --proto "=https" -LsSf \
+      "https://github.com/jamesmistry/breadlog/releases/latest/download/breadlog-package-linux_x86-64.tar.gz" \
+      | sudo tar -xz -C /
 
-      $ breadlog --version
+Test your installation by running Breadlog:
+
+.. code-block:: bash
+
+   breadlog --version
+
+If you'd like to install a specific version of Breadlog, go to the
+`list of Breadlog releases <https://github.com/jamesmistry/breadlog/releases>`_.
 
 Step 2: Configuring a repository
 --------------------------------
@@ -71,7 +77,7 @@ references in check mode.
 
    .. code-block:: bash
 
-      $ breadlog -c ./Breadlog.yaml --check
+      breadlog -c ./Breadlog.yaml --check
 
    You'll see output similar to the following:
 
@@ -102,7 +108,7 @@ references in check mode.
 
    .. code-block:: bash
 
-      $ breadlog -c ./Breadlog.yaml
+      breadlog -c ./Breadlog.yaml
 
 3. Assuming you're happy with the changes Breadlog has made, commit them to 
    your repository along with the ``Breadlog.yaml`` and ``Breadlog.lock`` 

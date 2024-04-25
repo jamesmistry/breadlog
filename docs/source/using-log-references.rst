@@ -1,10 +1,10 @@
-Using Log Reference IDs
-=======================
+Using Log References
+====================
 
-Extracting reference IDs from log messages
-------------------------------------------
+Extracting references from log messages
+---------------------------------------
 
-Reference IDs can be extracted from log messages using the following regular
+References can be extracted from log messages using the following regular
 expression:
 
 .. code-block:: 
@@ -12,7 +12,7 @@ expression:
    \[ref: ([0-9]{1,10})\]
 
 When matching, the regular expression above results in one match group 
-containing the numerical reference ID in the log message. Valid reference IDs 
+containing the numerical reference in the log message. Valid references 
 may be in the range 1 to 4294967295.
 
 The expression is compatible with common PCRE, ECMAScript, Rust, Python, 
@@ -23,8 +23,8 @@ storing or analysing them. This way your log storage and analysis system can
 store references in a structured field, allowing you to more easily refer 
 to them in queries and probably resulting in them using less storage.
 
-Using reference IDs to improve log analysis
--------------------------------------------
+Using references to improve log analysis
+----------------------------------------
 
 .. note::
     Log query examples in this section are given in SQL to clearly communicate 
@@ -98,7 +98,7 @@ This works, but doing it this way means we have to accept that:
 
 The log references stored in log messages by Breadlog provide a more reliable, 
 lower effort alternative for identifying events based on logs. The equivalent 
-original log message from Rocket but with a Breadlog reference ID looks like 
+original log message from Rocket but with a Breadlog reference looks like 
 this:
 
 .. code-block:: 
@@ -117,7 +117,7 @@ After being updated, the log message looks like this:
 
    2023-05-02T21:50:19.963Z INFO [ref: 24] Bad incoming GET HTTP request.
 
-Note how the numerical reference ID doesn't change. This means the query we 
+Note how the numerical reference doesn't change. This means the query we 
 used to analyse the logs still works after the change to the log message.
 
 Also, the query works regardless of the interpolated content and without us 
@@ -127,7 +127,7 @@ inserted into the log message.
 Aggregating event types
 ^^^^^^^^^^^^^^^^^^^^^^^
 
-As illustrated above, log reference IDs make running aggregate queries across 
+As illustrated above, log references make running aggregate queries across 
 logs easier. This is important because it's very common to analyse logs this 
 way, for example to:
 
