@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.4.0](https://github.com/jamesmistry/breadlog/compare/v0.3.1...v0.4.0) (2024-04-25)
+
+
+### Features
+
+* Add support for KVPs in Rust log macros ([cb3d535](https://github.com/jamesmistry/breadlog/commit/cb3d53512c0c707f61e084e718611b683aede370))
+* Remove requirement for glibc ([8a3b494](https://github.com/jamesmistry/breadlog/commit/8a3b4945d73421236bb075d3f949d54552f7872e))
+
 ## [0.3.1](https://github.com/jamesmistry/breadlog/compare/v0.3.0...v0.3.1) (2024-03-07)
 
 
