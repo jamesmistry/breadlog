@@ -171,7 +171,7 @@ fn test_check()
 
     let command_stdout = String::from_utf8(output.stdout).unwrap();
 
-    assert!(command_stdout.contains("Total missing references (all files): 46"));
+    assert!(command_stdout.contains("Total missing references (all files): 45"));
     assert!(command_stdout.contains("Failed: One or more missing references were found"));
 
     const DATA_PATH_PREFIX: &str = "tests/rust_data";
@@ -262,7 +262,7 @@ fn test_codegen()
 
     let command_stdout = String::from_utf8(output.stdout).unwrap();
 
-    assert!(command_stdout.contains("Num. inserted reference(s): 46"));
+    assert!(command_stdout.contains("Num. inserted reference(s): 45"));
 
     const DATA_PATH_PREFIX: &str = "tests/rust_data";
 

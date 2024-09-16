@@ -58,6 +58,73 @@ pub fn find_references(language: CodeLanguage, code: &str, config: &Config) -> V
     }
 }
 
+/// Determines if a log message present at the specified position should be ignored based on the presence of an ignore directive.
+/// 
+/// # Arguments
+/// 
+/// * `code` - The source code containing the log message.
+/// * `subject_pos` - The character index in the source code of the first character of the log statement.
+/// * `line_comment_extractor` - A regular expression that matches single-line comments in the source code.
+/// 
+/// # Returns
+/// 
+/// True if the log message should be ignored, false otherwise.
+pub fn check_for_ignore_directive(code: &str, subject_pos: usize, line_comment_extractor: &Regex) -> bool
+{
+    const IGNORE_DIRECTIVE_TEXT: &str = "breadlog:ignore";
+
+    /*
+     * Backtrack from subject_pos (character index in code) until a previous non-empty line is found.
+     * 
+     * If the non-empty line contains a comment (as defined by the caller's regular expression), and that
+     * comment's text specifies the ignore directive, return true. Otherwise, return false.
+     */
+
+    let mut first_line = true;
+
+    for line in code[..subject_pos + 1].lines().rev()
+    {
+        if first_line
+        {
+            first_line = false;
+            continue;
+        }
+
+        let line = line.trim();
+
+        if line.is_empty()
+        {
+            continue;
+        }
+
+        match line_comment_extractor.captures(line)
+        {
+            None => break,
+            Some(capture) =>
+            {
+                for group in capture.iter()
+                {
+                    match group
+                    {
+                        None => continue,
+                        Some(comment) =>
+                        {
+                            if comment.as_str().to_lowercase().trim() == IGNORE_DIRECTIVE_TEXT
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+
+                break;
+            }
+        }
+    }
+
+    false
+}
+
 /// Returns the programming language of the source code.
 impl CodePosition
 {
@@ -171,6 +238,13 @@ mod tests
     #![allow(unused_imports)]
     use crate::parser::CodePosition;
     use crate::parser::LogRefEntry;
+    use crate::parser::check_for_ignore_directive;
+    use regex::Regex;
+
+    fn get_comment_extractor() -> Regex
+    {
+        Regex::new(r"\/\/(.+)").unwrap()
+    }
 
     #[test]
     fn test_logref_not_exists()
@@ -288,5 +362,124 @@ mod tests
         let test_slice = &test_data[0..test_data.len()];
 
         assert_eq!(LogRefEntry::extract_reference(test_slice), Some(1234));
+    }
+
+    #[test]
+    fn test_ignore_directive_no_comment()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("not_a_comment();\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert_eq!(check_for_ignore_directive(test_slice, 17, &comment_pattern), false);
+    }
+
+    #[test]
+    fn test_ignore_directive_empty_comment()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("//\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert_eq!(check_for_ignore_directive(test_slice, 3, &comment_pattern), false);
+    }
+
+    #[test]
+    fn test_ignore_directive_non_directive_comment()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("// Irrelevant comment.\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert_eq!(check_for_ignore_directive(test_slice, 23, &comment_pattern), false);
+    }
+
+    #[test]
+    fn test_ignore_directive_non_preceding_comment()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("// breadlog:ignore\n// Irrelevant comment.\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert_eq!(check_for_ignore_directive(test_slice, 42, &comment_pattern), false);
+    }
+
+    #[test]
+    fn test_ignore_directive_separated_by_non_comment()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("// breadlog:ignore\nirrelevant_code();\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert_eq!(check_for_ignore_directive(test_slice, 38, &comment_pattern), false);
+    }
+
+    #[test]
+    fn test_ignore_directive_present()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("// breadlog:ignore\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert!(check_for_ignore_directive(test_slice, 19, &comment_pattern));
+    }
+
+    #[test]
+    fn test_ignore_directive_present_ignore_comment_whitespace()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("//    breadlog:ignore    \ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert!(check_for_ignore_directive(test_slice, 26, &comment_pattern));
+    }
+
+    #[test]
+    fn test_ignore_directive_present_case_neutral()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("// BReadLOG:IGnoRE\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert!(check_for_ignore_directive(test_slice, 19, &comment_pattern));
+    }
+
+    #[test]
+    fn test_ignore_directive_present_ignore_line_whitespace()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data = String::from("// breadlog:ignore\n   \n\n \n\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert!(check_for_ignore_directive(test_slice, 27, &comment_pattern));
+    }
+
+    #[test]
+    fn test_ignore_directive_multi_capture()
+    {
+        let comment_pattern = Regex::new(r"\/\/(.+)|\/\*(.+)\*\/").unwrap();
+
+        {
+            let test_data = String::from("// breadlog:ignore\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+            let test_slice = &test_data[0..test_data.len()];
+
+            assert!(check_for_ignore_directive(test_slice, 19, &comment_pattern));
+        }
+
+        {
+            let test_data = String::from("/* breadlog:ignore */\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+            let test_slice = &test_data[0..test_data.len()];
+
+            assert!(check_for_ignore_directive(test_slice, 22, &comment_pattern));
+        }
     }
 }

@@ -48,8 +48,6 @@
     char: 32
   - line: 597
     char: 32
-  - line: 601
-    char: 32
 'rocket/core/lib/src/response/redirect.rs':
   - line: 161
     char: 21

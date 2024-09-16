@@ -102,6 +102,10 @@ references in check mode.
    references when run in code generation mode (when you omit the ``--check`` 
    flag).
 
+   If you'd like Breadlog to ignore a particular log statement, add a comment 
+   to the line before the statement with the text ``breadlog:ignore``. For
+   more details, see :doc:`excluding-statements`.
+
 2. Once you're happy with the output, you can run Breadlog in code generation
    mode (without the ``--check`` flag). This will modify your code, inserting 
    references in log messages where they are found to be missing:

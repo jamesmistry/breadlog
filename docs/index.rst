@@ -15,6 +15,7 @@ complex text parsing required.
    source/getting-started
    source/configuration
    source/running-breadlog
+   source/ignoring-statements
    source/known-limitations
    source/using-log-references
 

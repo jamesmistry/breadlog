@@ -10,9 +10,6 @@ Breadlog has several known limitations:
   semantics of the `log crate <https://crates.io/crates/log>`_, and specifically
   the level-specific macros (``info!``, ``warn!``, ``error!`` and so on but 
   not ``log!``).
-- Breadlog does not support specifying check mode exemptions in code (i.e. 
-  excluding lines from being checked for the presence of references using 
-  in-code annotations).
 - The only language Breadlog currently supports is Rust.
 - The only platform Breadlog currently supports is Linux x86-64.
 

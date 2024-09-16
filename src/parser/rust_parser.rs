@@ -1,8 +1,11 @@
 use super::CodePosition;
 use super::LogRefEntry;
+use super::check_for_ignore_directive;
 use crate::config::Config;
 use pest::Parser;
 use std::str::FromStr;
+use lazy_static::lazy_static;
+use regex::Regex;
 
 #[derive(Parser)]
 #[grammar = "parser/rust_grammar.pest"]
@@ -25,6 +28,10 @@ pub mod rust_log_ref_finder
     /// A vector of log references found in the source code.
     pub fn find(code: &str, config: &Config) -> Vec<LogRefEntry>
     {
+        lazy_static! {
+            static ref RUST_COMMENT_PATTERN: Regex = Regex::new(r"\/\/(.+)|\/\*(.+)\*\/").unwrap();
+        }
+
         let mut result = Vec::new();
 
         let parsed_target = RustParser::parse(Rule::file, code).unwrap().next().unwrap();
@@ -43,7 +50,15 @@ pub mod rust_log_ref_finder
                     let macro_name: &str = match inner_rule
                     {
                         None => continue,
-                        Some(rule) => rule.as_str(),
+                        Some(rule) => 
+                        {
+                            if check_for_ignore_directive(code, rule.as_span().start(), &RUST_COMMENT_PATTERN)
+                            {
+                                continue;
+                            }
+
+                            rule.as_str()
+                        }
                     };
 
                     // string_arg
@@ -652,6 +667,36 @@ rust:
         assert_eq!(found_macros[0].position().character(), 23);
         assert_eq!(found_macros[0].position().line(), 1);
         assert_eq!(found_macros[0].position().column(), 24);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_line_comment_ignore_directive()
+    {
+        let test_data = "// breadlog:ignore\ntest_macro1!(\"Test string 1.\");\ntest_macro2!(\"Test string 2.\");\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro2");
+        assert_eq!(found_macros[0].position().character(), 65);
+        assert_eq!(found_macros[0].position().line(), 3);
+        assert_eq!(found_macros[0].position().column(), 15);
+        assert_eq!(found_macros[0].reference(), None);
+    }
+
+    #[test]
+    fn test_block_comment_ignore_directive()
+    {
+        let test_data = "/* breadlog:ignore */\ntest_macro1!(\"Test string 1.\");\ntest_macro2!(\"Test string 2.\");\n";
+
+        let found_macros = apply_grammar_to_string(test_data);
+
+        assert_eq!(found_macros.len(), 1);
+        assert_eq!(found_macros[0]._macro_name(), "test_macro2");
+        assert_eq!(found_macros[0].position().character(), 68);
+        assert_eq!(found_macros[0].position().line(), 3);
+        assert_eq!(found_macros[0].position().column(), 15);
         assert_eq!(found_macros[0].reference(), None);
     }
 }

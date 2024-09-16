@@ -598,6 +598,7 @@ impl Rocket<Orbit> {
                         Ok(Arc::try_unwrap(rocket).map_err(|r| Error::shutdown(r, None))?)
                     }
                     Err(e) => {
+                        // breadlog:ignore
                         info!("Server failed prior to shutdown: {}:", e);
                         Err(Error::shutdown(rocket.clone(), e))
                     }
