@@ -1,11 +1,11 @@
+use super::check_for_ignore_directive;
 use super::CodePosition;
 use super::LogRefEntry;
-use super::check_for_ignore_directive;
 use crate::config::Config;
-use pest::Parser;
-use std::str::FromStr;
 use lazy_static::lazy_static;
+use pest::Parser;
 use regex::Regex;
+use std::str::FromStr;
 
 #[derive(Parser)]
 #[grammar = "parser/rust_grammar.pest"]
@@ -50,15 +50,19 @@ pub mod rust_log_ref_finder
                     let macro_name: &str = match inner_rule
                     {
                         None => continue,
-                        Some(rule) => 
+                        Some(rule) =>
                         {
-                            if check_for_ignore_directive(code, rule.as_span().start(), &RUST_COMMENT_PATTERN)
+                            if check_for_ignore_directive(
+                                code,
+                                rule.as_span().start(),
+                                &RUST_COMMENT_PATTERN,
+                            )
                             {
                                 continue;
                             }
 
                             rule.as_str()
-                        }
+                        },
                     };
 
                     // string_arg
