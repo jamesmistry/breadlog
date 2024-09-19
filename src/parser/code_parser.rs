@@ -32,7 +32,6 @@ pub struct LogRefEntry
     _macro_name: String,
 }
 
-/// Represents a programming language.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 pub enum CodeLanguage
 {
