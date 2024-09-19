@@ -44,3 +44,8 @@ configuration options.
        - module: log
          name: error
 
+     # Optional, default = "rs". The list of file extensions to treat as Rust
+     # source code.
+     extensions:
+       - rs
+
