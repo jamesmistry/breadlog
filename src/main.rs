@@ -22,7 +22,7 @@ const ERR_CODE_CONFIG_LOAD: u32 = 2;
 struct ProgArgs
 {
     #[clap(short, long, value_parser)]
-    /// YAML configuration file. Its format is described in detail at https://breadlog.readthedocs.io/en/latest/source/configuration.html
+    /// YAML configuration file. Its format is described in detail at https://breadlog.readthedocs.io/en/stable/source/configuration.html
     config: String,
 
     #[clap(long, action)]

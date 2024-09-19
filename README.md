@@ -2,7 +2,7 @@
 
 ![CI](https://github.com/jamesmistry/breadlog/actions/workflows/ci.yaml/badge.svg)
 
-For documentation about using Breadlog, see the [User Guide](https://breadlog.readthedocs.io/en/latest/).
+For documentation about using Breadlog, see the [User Guide](https://breadlog.readthedocs.io/en/stable/).
 
 ## Overview
 
@@ -36,11 +36,11 @@ If you'd like to install a specific version of Breadlog, go to the
 [list of Breadlog releases](https://github.com/jamesmistry/breadlog/releases).
 
 
-See the [User Guide](https://breadlog.readthedocs.io/en/latest/) for how to get started.
+See the [User Guide](https://breadlog.readthedocs.io/en/stable/) for how to get started.
 
 ## Using Breadlog
 
-See the [User Guide](https://breadlog.readthedocs.io/en/latest/).
+See the [User Guide](https://breadlog.readthedocs.io/en/stable/).
 
 ## Building Breadlog
 
