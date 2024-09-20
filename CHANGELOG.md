@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.5.0](https://github.com/jamesmistry/breadlog/compare/v0.4.0...v0.5.0) (2024-09-19)
+
+
+### Features
+
+* Exclude directives ([434f485](https://github.com/jamesmistry/breadlog/commit/434f485a1869b0dc96af2e35787792409baf16d3))
+
+
+### Bug Fixes
+
+* Add missing file extension config item docs ([127cb5f](https://github.com/jamesmistry/breadlog/commit/127cb5f3f61135b5016228cd8d7c57d781528c21))
+* Link to stable version of docs ([c60b72a](https://github.com/jamesmistry/breadlog/commit/c60b72aef8ea6efa326911bb17bc43718eac59d3))
+
 ## [0.4.0](https://github.com/jamesmistry/breadlog/compare/v0.3.1...v0.4.0) (2024-04-25)
 
 
