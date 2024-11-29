@@ -1,0 +1,12 @@
+[package]
+name = "fib-rs"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "fib-rs"
+path = "src/fib-rs.rs"
+
+[dependencies]
+log = { version = "0.4.22", features = ["kv"] }
+simple_logger = "4.3.0"

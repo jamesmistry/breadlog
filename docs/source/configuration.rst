@@ -27,6 +27,14 @@ configuration options.
    # Required. Configuration stanza for Rust code.
    rust:
 
+     # Optional, default = false. If true, causes Breadlog to look for and 
+     # insert references in the "structured" arguments to log statements.
+     # Note that generated code requires use of the "kv" feature with the log
+     # crate.
+     #
+     # See https://docs.rs/log/latest/log/kv/index.html for more details.
+     structured: false
+
      # Required. Detail about the macros and their containing modules used in your 
      # code for logging. Breadlog assumes use of the log crate 
      # (https://docs.rs/log/latest/log/), and this example configuration specifies

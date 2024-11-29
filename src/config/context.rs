@@ -15,6 +15,10 @@ pub struct RustLogMacro
 #[derive(Clone, Default, Debug, PartialEq, Serialize, Deserialize)]
 pub struct RustConfig
 {
+    /// Whether or not references are to be created using structured logging features.
+    #[serde(default = "default_rust_structured")]
+    pub structured: bool,
+
     /// The log macros to search for.
     pub log_macros: Vec<RustLogMacro>,
 
@@ -225,10 +229,16 @@ impl Context
     }
 }
 
-/// The default extensions for Rust files.
+/// Default extensions for Rust files.
 fn default_rust_extensions() -> Vec<String>
 {
     vec!["rs".to_string()]
+}
+
+/// Default structured logging behaviour.
+fn default_rust_structured() -> bool
+{
+    false
 }
 
 /// Default cache behaviour.

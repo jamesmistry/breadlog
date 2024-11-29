@@ -40,6 +40,7 @@ Step 2: Configuring a repository
       ---
       source_dir: <RELATIVE SOURCE DIRECTORY>
       rust:
+        structured: false
         log_macros:
           - module: log
             name: info
@@ -57,6 +58,10 @@ Step 2: Configuring a repository
           
 This configuration assumes you're using the `Rust log crate <https://crates.io/crates/log>`_
 for logging in your code.
+
+If you're using structured logging (the "kv" feature), set ``structured`` to 
+``true`` and Breadlog will maintain references as key-value pairs rather than 
+message text.
 
 Step 3: Running Breadlog for the first time
 -------------------------------------------
@@ -104,7 +109,7 @@ references in check mode.
 
    If you'd like Breadlog to ignore a particular log statement, add a comment 
    to the line before the statement with the text ``breadlog:ignore``. For
-   more details, see :doc:`excluding-statements`.
+   more details, see :doc:`directives`.
 
 2. Once you're happy with the output, you can run Breadlog in code generation
    mode (without the ``--check`` flag). This will modify your code, inserting 

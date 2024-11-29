@@ -1,0 +1,12 @@
+---
+'src/fib-rs.rs':
+  - line: 9
+    char: 15
+  - line: 20
+    char: 11
+  - line: 38
+    char: 20
+  - line: 48
+    char: 20
+  - line: 54
+    char: 11

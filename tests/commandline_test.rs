@@ -41,12 +41,14 @@ fn load_expected_changes(expected_changes_filename: &String) -> ExpectedChanges
 /// * `file_contents` - The contents of the file to check.
 /// * `expected_line_changes` - The expected changes to the file.
 /// * `all_ids` - A mutable reference to a vector containing all reference IDs found in the file, populated by this function.
+/// * `structured` - Whether reference IDs are expected to be inserted as key-value pairs or log message prefixes.
 ///
 fn check_modified_file(
     file_path: &String,
     file_contents: &String,
     expected_line_changes: &Vec<LineChange>,
     all_ids: &mut Vec<usize>,
+    structured: bool,
 )
 {
     let mut line_num: usize = 1;
@@ -59,9 +61,19 @@ fn check_modified_file(
                 lazy_static! {
                     static ref LOG_REF_PATTERN: Regex =
                         Regex::new(r"\[ref: ([0-9]{1,10})\]").unwrap();
+                    static ref KVP_REF_PATTERN: Regex = Regex::new(r"ref = ([0-9]{1,10})").unwrap();
                 }
 
-                let ref_capture = LOG_REF_PATTERN.captures(line).unwrap();
+                let ref_capture;
+                if structured
+                {
+                    ref_capture = KVP_REF_PATTERN.captures(line).unwrap();
+                }
+                else
+                {
+                    ref_capture = LOG_REF_PATTERN.captures(line).unwrap();
+                }
+
                 let ref_match = ref_capture.get(0).unwrap();
 
                 assert_eq!(
@@ -79,6 +91,131 @@ fn check_modified_file(
 
         line_num += 1;
     }
+}
+
+fn run_integration_test_case(test_case_name: &str, expected_num_insertions: usize, structured: bool)
+{
+    let temp_dir = TempDir::new("breadlog_test").unwrap();
+
+    copy_dir::copy_dir(
+        Path::new("tests/rust_data"),
+        Path::new(temp_dir.path()).join("rust_data"),
+    )
+    .unwrap();
+
+    let expected_output_filename = temp_dir
+        .path()
+        .join(format!(
+            "rust_data/{}/breadlog-test-expected.yaml",
+            test_case_name
+        ))
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let expected_changes = load_expected_changes(&expected_output_filename);
+
+    let config_filename = temp_dir
+        .path()
+        .join(format!("rust_data/{}/breadlog.yaml", test_case_name))
+        .to_str()
+        .unwrap()
+        .to_string();
+
+    let cache_filename = temp_dir
+        .path()
+        .join(format!("rust_data/{}/Breadlog.lock", test_case_name));
+
+    let output = test_bin::get_test_bin("breadlog")
+        .args(["--config", &config_filename])
+        .output()
+        .unwrap();
+
+    assert!(output.status.success());
+    assert!(cache_filename.exists());
+
+    let command_stdout = String::from_utf8(output.stdout).unwrap();
+
+    let expected_insertion_total_message =
+        format!("Num. inserted reference(s): {}", expected_num_insertions);
+    assert!(command_stdout.contains(&expected_insertion_total_message));
+
+    let data_path_prefix: String = format!("tests/rust_data/{}", test_case_name);
+
+    let mut expected_ref_count: usize = 0;
+    let mut all_ids: Vec<usize> = Vec::new();
+
+    for entry in WalkDir::new(Path::new(&data_path_prefix).as_os_str())
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+    {
+        if entry.path().extension().is_none()
+        {
+            continue;
+        }
+
+        if entry.path().extension().unwrap() != "rs"
+        {
+            continue;
+        }
+
+        let relative_path = entry
+            .path()
+            .canonicalize()
+            .unwrap()
+            .clone()
+            .to_str()
+            .unwrap()
+            .to_string()
+            .chars()
+            .skip(
+                std::env::current_dir().unwrap().to_str().unwrap().len()
+                    + data_path_prefix.len()
+                    + 2,
+            )
+            .collect::<String>();
+
+        let test_file_path = temp_dir
+            .path()
+            .join("rust_data")
+            .join(test_case_name)
+            .join(relative_path.clone());
+        let test_file_contents = std::fs::read_to_string(test_file_path).unwrap();
+
+        if !expected_changes.contains_key(&relative_path)
+        {
+            /*
+             * This file is not expected to be modified.
+             */
+
+            let canonical_file_contents = std::fs::read_to_string(entry.path()).unwrap();
+
+            assert_eq!(
+                canonical_file_contents, test_file_contents,
+                "Unexpected file modification: {}",
+                relative_path
+            );
+
+            continue;
+        }
+
+        let expected_line_changes = expected_changes.get(&relative_path).unwrap();
+
+        check_modified_file(
+            &relative_path,
+            &test_file_contents,
+            expected_line_changes,
+            &mut all_ids,
+            structured,
+        );
+
+        expected_ref_count += expected_line_changes.len();
+    }
+
+    assert_eq!(all_ids.len(), expected_ref_count);
+
+    check_ids_contiguous_and_no_duplicates(&all_ids);
 }
 
 /// Check that the given reference IDs are contiguous and unique.
@@ -224,118 +361,13 @@ fn test_check()
 }
 
 #[test]
-fn test_codegen()
+fn test_integration_rust_non_structured_ref_ids()
 {
-    let temp_dir = TempDir::new("breadlog_test").unwrap();
+    run_integration_test_case("rocket", 45, false);
+}
 
-    copy_dir::copy_dir(
-        Path::new("tests/rust_data"),
-        Path::new(temp_dir.path()).join("rust_data"),
-    )
-    .unwrap();
-
-    let expected_output_filename = temp_dir
-        .path()
-        .join("rust_data/rocket/breadlog-test-expected.yaml")
-        .to_str()
-        .unwrap()
-        .to_string();
-
-    let expected_changes = load_expected_changes(&expected_output_filename);
-
-    let config_filename = temp_dir
-        .path()
-        .join("rust_data/rocket/breadlog.yaml")
-        .to_str()
-        .unwrap()
-        .to_string();
-
-    let cache_filename = temp_dir.path().join("rust_data/rocket/Breadlog.lock");
-
-    let output = test_bin::get_test_bin("breadlog")
-        .args(["--config", &config_filename])
-        .output()
-        .unwrap();
-
-    assert!(output.status.success());
-    assert!(cache_filename.exists());
-
-    let command_stdout = String::from_utf8(output.stdout).unwrap();
-
-    assert!(command_stdout.contains("Num. inserted reference(s): 45"));
-
-    const DATA_PATH_PREFIX: &str = "tests/rust_data";
-
-    let mut expected_ref_count: usize = 0;
-    let mut all_ids: Vec<usize> = Vec::new();
-
-    for entry in WalkDir::new(Path::new(DATA_PATH_PREFIX).as_os_str())
-        .into_iter()
-        .filter_map(|e| e.ok())
-        .filter(|e| e.file_type().is_file())
-    {
-        if entry.path().extension().is_none()
-        {
-            continue;
-        }
-
-        if entry.path().extension().unwrap() != "rs"
-        {
-            continue;
-        }
-
-        let relative_path = entry
-            .path()
-            .canonicalize()
-            .unwrap()
-            .clone()
-            .to_str()
-            .unwrap()
-            .to_string()
-            .chars()
-            .skip(
-                std::env::current_dir().unwrap().to_str().unwrap().len()
-                    + DATA_PATH_PREFIX.len()
-                    + 2,
-            )
-            .collect::<String>();
-
-        let test_file_path = temp_dir
-            .path()
-            .join("rust_data")
-            .join(relative_path.clone());
-        let test_file_contents = std::fs::read_to_string(test_file_path).unwrap();
-
-        if !expected_changes.contains_key(&relative_path)
-        {
-            /*
-             * This file is not expected to be modified.
-             */
-
-            let canonical_file_contents = std::fs::read_to_string(entry.path()).unwrap();
-
-            assert_eq!(
-                canonical_file_contents, test_file_contents,
-                "Unexpected file modification: {}",
-                relative_path
-            );
-
-            continue;
-        }
-
-        let expected_line_changes = expected_changes.get(&relative_path).unwrap();
-
-        check_modified_file(
-            &relative_path,
-            &test_file_contents,
-            expected_line_changes,
-            &mut all_ids,
-        );
-
-        expected_ref_count += expected_line_changes.len();
-    }
-
-    assert_eq!(all_ids.len(), expected_ref_count);
-
-    check_ids_contiguous_and_no_duplicates(&all_ids);
+#[test]
+fn test_integration_rust_structured_ref_ids()
+{
+    run_integration_test_case("fib-rs", 5, true);
 }

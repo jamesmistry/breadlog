@@ -4,6 +4,10 @@ Using Log References
 Extracting references from log messages
 ---------------------------------------
 
+If you're not using structured logging, you'll need to extract references
+from log message text through configuration of a log ingestion tool
+(such as `Vector <https://vector.dev/guides/level-up/transformation/>`_).
+
 References can be extracted from log messages using the following regular
 expression:
 
