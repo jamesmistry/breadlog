@@ -65,11 +65,11 @@ jobs:
     - name: Setup | Rust Nightly
       run: "rustup install nightly && rustup default nightly"
     - name: Setup | LLVM Tooling
-      run: "rustup component add llvm-tools-preview"
+      run: "rustup component add llvm-tools-preview --toolchain nightly"
     - name: Setup | LLVM helper
-      run: "cargo install cargo-binutils && rustup component add llvm-tools-preview"
+      run: "cargo install cargo-binutils && cargo install cargo-llvm-cov"
     - name: Tests | App
-      run: './.github/workflows/test_with_coverage.bash "$(pwd)" &> ./small_test_coverage_report.txt && cat ./small_test_coverage_report.txt'
+      run: './.github/workflows/test_with_coverage.bash "$(pwd)" &> ./test_coverage_report.txt && cat ./test_coverage_report.txt'
     - name: Clean artifacts from test | App
       run: 'rm -rf ./target/*'
     - name: Create build environment | App
@@ -79,8 +79,8 @@ jobs:
     - name: Store code coverage report | App
       uses: actions/upload-artifact@v3
       with:
-        name: small_test_coverage_report
-        path: small_test_coverage_report.txt
+        name: test_coverage_report
+        path: test_coverage_report.txt
         retention-days: 7
     - name: Store debug output | App
       uses: actions/upload-artifact@v3

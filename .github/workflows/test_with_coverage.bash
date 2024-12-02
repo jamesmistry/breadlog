@@ -25,25 +25,8 @@ trap on_exit EXIT
 
 cd "${PROJ_DIR}" || exit 2
 
-scratchpad="$(mktemp -d)"
-printf "%s\n" "Profiling artefacts in ${scratchpad}"
+# Generate a plain text report for easy consumption in stdout
+cargo llvm-cov || exit 3
 
-RUSTFLAGS="-C instrument-coverage" LLVM_PROFILE_FILE="${scratchpad}/profiler-%m.profraw" cargo test --tests || exit 3
-
-prof_out_file="${scratchpad}/profiler.profdata"
-rust-profdata merge -sparse ${scratchpad}/*.profraw -o "${prof_out_file}" || exit 4
-
-rust-cov report \
-    $( \
-      for file in \
-        $( \
-          RUSTFLAGS="-C instrument-coverage" \
-            cargo test --tests --no-run --message-format=json \
-              | jq -r "select(.profile.test == true) | .filenames[]" \
-              | grep -v dSYM - \
-        ); \
-      do \
-        printf "%s %s " -object $file; \
-      done \
-    ) \
-    --instr-profile="${prof_out_file}" --summary-only --ignore-filename-regex='/.cargo/registry' || exit 5
+# Generate formatted HTML report (it will be stored in target/llvm-cov/html
+cargo llvm-cov report --html || exit 4
