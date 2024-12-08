@@ -4,6 +4,15 @@ use regex::Regex;
 use super::rust_parser::rust_log_ref_finder;
 use crate::config::Config;
 
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum LogRefKind
+{
+    Unknown,
+    String,
+    StructuredPreExisting,
+    StructuredNew,
+}
+
 /// Represents a position in the source code.
 #[derive(Copy, Clone)]
 pub struct CodePosition
@@ -30,6 +39,15 @@ pub struct LogRefEntry
 
     /// The name of the macro used to log the message.
     _macro_name: String,
+
+    /// The kind of log reference.
+    kind: LogRefKind,
+
+    /// Characters to insert at the specified position, before the reference ID.
+    insertion_prefix: Option<String>,
+
+    /// Characters to insert after the reference ID.
+    insertion_suffix: Option<String>,
 }
 
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
@@ -57,25 +75,26 @@ pub fn find_references(language: CodeLanguage, code: &str, config: &Config) -> V
     }
 }
 
-/// Determines if a log message present at the specified position should be ignored based on the presence of an ignore directive.
+/// Determines if a log message present at the specified position is preceded
+/// by a boolean directive flag in a comment.
 ///
 /// # Arguments
 ///
+/// * `directive_name` - The name of the directive to search for.
 /// * `code` - The source code containing the log message.
 /// * `subject_pos` - The character index in the source code of the first character of the log statement.
 /// * `line_comment_extractor` - A regular expression that matches single-line comments in the source code.
 ///
 /// # Returns
 ///
-/// True if the log message should be ignored, false otherwise.
-pub fn check_for_ignore_directive(
+/// True if the flag is present, false otherwise.
+fn check_for_boolean_directive(
+    directive_name: &str,
     code: &str,
     subject_pos: usize,
     line_comment_extractor: &Regex,
 ) -> bool
 {
-    const IGNORE_DIRECTIVE_TEXT: &str = "breadlog:ignore";
-
     /*
      * Backtrack from subject_pos (character index in code) until a previous non-empty line is found.
      *
@@ -112,7 +131,7 @@ pub fn check_for_ignore_directive(
                         None => continue,
                         Some(comment) =>
                         {
-                            if comment.as_str().to_lowercase().trim() == IGNORE_DIRECTIVE_TEXT
+                            if comment.as_str().to_lowercase().trim() == directive_name
                             {
                                 return true;
                             }
@@ -126,6 +145,75 @@ pub fn check_for_ignore_directive(
     }
 
     false
+}
+
+/// Determines if the specified code position is influenced by an "ignore"
+/// directive. An ignore directive causes the affected line to be ignored for
+/// the purposes of extracting and inserting log references.
+///
+/// # Arguments
+///
+/// * `code` - The source code containing the log message.
+/// * `subject_pos` - The character index in the source code of the first character of the log statement.
+/// * `line_comment_extractor` - A regular expression that matches single-line comments in the source code.
+///
+/// # Returns
+///
+/// True if the log message should be ignored, false otherwise.
+pub fn check_for_ignore_directive(
+    code: &str,
+    subject_pos: usize,
+    line_comment_extractor: &Regex,
+) -> bool
+{
+    const IGNORE_DIRECTIVE_TEXT: &str = "breadlog:ignore";
+
+    check_for_boolean_directive(
+        IGNORE_DIRECTIVE_TEXT,
+        code,
+        subject_pos,
+        line_comment_extractor,
+    )
+}
+
+/// Determines if the specified code position is influenced by a "no KVP"
+/// directive. A "no KVP" directive causes references on the affected line to
+/// be extracted from and inserted into log message strings only, even when
+/// in structured mode.
+///
+/// # Arguments
+///
+/// * `code` - The source code containing the log message.
+/// * `subject_pos` - The character index in the source code of the first character of the log statement.
+/// * `line_comment_extractor` - A regular expression that matches single-line comments in the source code.
+///
+/// # Returns
+///
+/// True if references should only be extracted from/inserted into log message strings, false otherwise.
+pub fn check_for_no_kvp_directive(
+    code: &str,
+    subject_pos: usize,
+    line_comment_extractor: &Regex,
+) -> bool
+{
+    const NO_KVP_DIRECTIVE_TEXT: &str = "breadlog:no-kvp";
+
+    check_for_boolean_directive(
+        NO_KVP_DIRECTIVE_TEXT,
+        code,
+        subject_pos,
+        line_comment_extractor,
+    )
+}
+
+/// Returns the key used to identify a log reference in a key-value pair.
+pub fn get_name_for_ref_kvp_key() -> &'static str
+{
+    lazy_static! {
+        static ref REF_KVP_KEY: String = String::from("ref");
+    }
+
+    REF_KVP_KEY.as_str()
 }
 
 /// Returns the programming language of the source code.
@@ -175,12 +263,22 @@ impl LogRefEntry
     /// * `position` - The position of the log reference in the source code.
     /// * `reference` - The numeric reference associated with the log message, if one exists.
     /// * `_macro_name` - The name of the macro used to log the message.
-    pub fn new(position: CodePosition, reference: Option<u32>, _macro_name: String) -> LogRefEntry
+    pub fn new(
+        position: CodePosition,
+        reference: Option<u32>,
+        _macro_name: String,
+        kind: LogRefKind,
+        insertion_prefix: Option<String>,
+        insertion_suffix: Option<String>,
+    ) -> LogRefEntry
     {
         LogRefEntry {
             position,
             reference,
             _macro_name,
+            kind,
+            insertion_prefix,
+            insertion_suffix,
         }
     }
 
@@ -229,6 +327,65 @@ impl LogRefEntry
         self.reference
     }
 
+    /// Returns the kind of log reference.
+    #[allow(dead_code)]
+    pub fn kind(&self) -> LogRefKind
+    {
+        self.kind
+    }
+
+    /// It's possible that for structured log messages, the key to hold the
+    /// reference is present but the value associated with it isn't usable,
+    /// for example because it's not an integer type. In this case, this
+    /// function returns false.
+    pub fn usable_reference_position(&self) -> bool
+    {
+        if self.kind == LogRefKind::StructuredPreExisting && !self.exists()
+        {
+            return false;
+        }
+
+        true
+    }
+
+    /// Returns a string representation of the log reference suitable for
+    /// inclusion in code. The language-specific parser determines the format
+    /// unless the reference is being inserted into a string literal, in
+    /// which case the canonical "[ref: 1234]" format is used.
+    ///
+    /// # Arguments
+    ///
+    /// * `reference_id` - The numerical ID to insert.
+    pub fn insertable_reference_string(&self, reference_id: u32) -> String
+    {
+        let mut result = String::new();
+
+        if self.insertion_prefix.is_none() && self.insertion_suffix.is_none()
+        {
+            /*
+             * By default, produce a language-agnostic reference string for
+             * inclusion in a log message string literal.
+             */
+            result.push_str(&format!("[ref: {}] ", reference_id));
+        }
+        else
+        {
+            if let Some(prefix) = &self.insertion_prefix
+            {
+                result.push_str(prefix);
+            }
+
+            result.push_str(format!("{}", reference_id).as_str());
+
+            if let Some(suffix) = &self.insertion_suffix
+            {
+                result.push_str(suffix);
+            }
+        }
+
+        result
+    }
+
     /// Returns the name of the macro used to log the message.
     pub fn _macro_name(&self) -> &str
     {
@@ -240,6 +397,8 @@ mod tests
 {
     #![allow(unused_imports)]
     use crate::parser::check_for_ignore_directive;
+    use crate::parser::check_for_no_kvp_directive;
+    use crate::parser::code_parser::LogRefKind;
     use crate::parser::CodePosition;
     use crate::parser::LogRefEntry;
     use regex::Regex;
@@ -263,6 +422,9 @@ mod tests
             },
             None,
             String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            None,
+            None,
         );
 
         assert_eq!(subject.exists(), false);
@@ -286,6 +448,9 @@ mod tests
             },
             Some(1024),
             String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            None,
+            None,
         );
 
         assert!(subject.exists());
@@ -294,6 +459,132 @@ mod tests
         assert_eq!(subject.position().line(), 5);
         assert_eq!(subject.position().column(), 2);
         assert_eq!(subject._macro_name(), "test_macro");
+    }
+
+    #[test]
+    fn test_logref_usable_present_string()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            Some(1024),
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            None,
+            None,
+        );
+
+        assert!(subject.usable_reference_position());
+    }
+
+    #[test]
+    fn test_logref_usable_not_present_string()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            None,
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            None,
+            None,
+        );
+
+        assert!(subject.usable_reference_position());
+    }
+
+    #[test]
+    fn test_logref_usable_present_structured_new()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            Some(1024),
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::StructuredNew,
+            None,
+            None,
+        );
+
+        assert!(subject.usable_reference_position());
+    }
+
+    #[test]
+    fn test_logref_usable_not_present_structured_new()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            None,
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::StructuredNew,
+            None,
+            None,
+        );
+
+        assert!(subject.usable_reference_position());
+    }
+
+    #[test]
+    fn test_logref_usable_present_structured_existing()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            Some(1024),
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::StructuredPreExisting,
+            None,
+            None,
+        );
+
+        assert!(subject.usable_reference_position());
+    }
+
+    #[test]
+    fn test_logref_usable_not_present_structured_existing()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            None,
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::StructuredPreExisting,
+            None,
+            None,
+        );
+
+        assert_eq!(subject.usable_reference_position(), false);
     }
 
     #[test]
@@ -511,5 +802,119 @@ mod tests
 
             assert!(check_for_ignore_directive(test_slice, 22, &comment_pattern));
         }
+    }
+
+    #[test]
+    fn test_no_kvp_directive_present()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data =
+            String::from("// breadlog:no-kvp\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert!(check_for_no_kvp_directive(test_slice, 19, &comment_pattern));
+    }
+
+    #[test]
+    fn test_no_kvp_directive_not_present()
+    {
+        let comment_pattern = get_comment_extractor();
+
+        let test_data =
+            String::from("// breadlog:other\ntest_macro!(\"[ref: 1234] Test string.\");\n");
+        let test_slice = &test_data[0..test_data.len()];
+
+        assert_eq!(
+            check_for_no_kvp_directive(test_slice, 19, &comment_pattern),
+            false
+        );
+    }
+
+    #[test]
+    fn test_insertable_reference_default()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            None,
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            None,
+            None,
+        );
+
+        assert_eq!(subject.insertable_reference_string(123), "[ref: 123] ");
+    }
+
+    #[test]
+    fn test_insertable_reference_prefix_only()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            None,
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            Some("test-prefix: ".to_string()),
+            None,
+        );
+
+        assert_eq!(subject.insertable_reference_string(123), "test-prefix: 123");
+    }
+
+    #[test]
+    fn test_insertable_reference_suffix_only()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            None,
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            None,
+            Some(" :test-suffix".to_string()),
+        );
+
+        assert_eq!(subject.insertable_reference_string(123), "123 :test-suffix");
+    }
+
+    #[test]
+    fn test_insertable_reference_prefix_and_suffix()
+    {
+        use std::str::FromStr;
+
+        let subject = LogRefEntry::new(
+            CodePosition {
+                character: 10,
+                line: 5,
+                column: 2,
+            },
+            None,
+            String::from_str("test_macro").unwrap(),
+            LogRefKind::String,
+            Some("test-prefix: ".to_string()),
+            Some(" :test-suffix".to_string()),
+        );
+
+        assert_eq!(
+            subject.insertable_reference_string(123),
+            "test-prefix: 123 :test-suffix"
+        );
     }
 }

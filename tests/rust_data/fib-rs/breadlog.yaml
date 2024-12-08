@@ -1,0 +1,11 @@
+---
+source_dir: ./src
+rust:
+  structured: true
+  log_macros:
+    - module: log
+      name: info
+    - module: log
+      name: warn
+    - module: log
+      name: error

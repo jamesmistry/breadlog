@@ -162,7 +162,7 @@ pub trait ReferenceProcessor<Params, MapResult, ReduceResult>
     fn reduce(map_result: &[MapResult]) -> Option<ReduceResult>;
 }
 
-/// A reference processor for determining the next available contiguous reference ID in a code base. As with
+/// A reference processor for determining the next available contiguous reference in a code base. As with
 /// all reference processors, the map and reduce operations are orchestrated by `process_references()`.
 struct NextReferenceIdProcessor {}
 
@@ -188,13 +188,16 @@ impl ReferenceProcessor<u32, (u32, usize), (u32, usize)> for NextReferenceIdProc
 
         for reference in entries.iter()
         {
-            if let Some(reference_id) = reference.reference()
+            if reference.usable_reference_position()
             {
-                max_file_ref = cmp::max(max_file_ref, reference_id);
-            }
-            else
-            {
-                num_missing_refs += 1;
+                if let Some(reference_id) = reference.reference()
+                {
+                    max_file_ref = cmp::max(max_file_ref, reference_id);
+                }
+                else
+                {
+                    num_missing_refs += 1;
+                }
             }
         }
 
@@ -246,13 +249,31 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
 
         for reference in entries.iter()
         {
-            if reference.reference().is_none()
+            if !reference.exists()
             {
-                missing_ref_count += 1;
-
                 let path_copy = path.to_string();
                 let line = reference.position().line();
                 let column = reference.position().column();
+
+                if !reference.usable_reference_position()
+                {
+                    task::spawn(async move {
+                        warn!(
+                            "[ref: 35] Unusable reference will be ignored in file {}, line {}, column {}",
+                            path_copy, line, column,
+                        );
+                    })
+                    .await;
+
+                    tracing::event!(
+                        tracing::Level::TRACE,
+                        "unusable_reference_{}_{}",
+                        line,
+                        column
+                    );
+
+                    continue;
+                }
 
                 task::spawn(async move {
                     warn!(
@@ -268,6 +289,8 @@ impl ReferenceProcessor<u32, u32, u32> for CountMissingReferenceIdProcessor
                     line,
                     column
                 );
+
+                missing_ref_count += 1;
             }
         }
 
@@ -328,7 +351,11 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
         entries: &[parser::LogRefEntry],
     ) -> Option<InsertReferencesResult>
     {
-        if entries.iter().filter(|&e| !e.exists()).count() == 0
+        if entries
+            .iter()
+            .filter(|&e| !e.exists() && e.usable_reference_position())
+            .count()
+            == 0
         {
             return Some(InsertReferencesResult {
                 failure: false,
@@ -381,7 +408,9 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
 
         let mut unwritten_content_start_pos: usize = 0;
 
-        for entry in entries.iter().filter(|e| !e.exists())
+        for entry in entries
+            .iter()
+            .filter(|e| !e.exists() && e.usable_reference_position())
         {
             let insert_pos = entry.position().character();
 
@@ -426,11 +455,11 @@ impl ReferenceProcessor<Arc<AtomicU32>, InsertReferencesResult, InsertReferences
             unwritten_content_start_pos += insert_pos - unwritten_content_start_pos;
 
             let reference_id = next_reference_id.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
-            let message_header = format!("[ref: {}] ", reference_id);
+            let insertable_ref_id_string = entry.insertable_reference_string(reference_id);
 
             match scratch_file
                 .file()
-                .write_all(message_header.as_bytes())
+                .write_all(insertable_ref_id_string.as_bytes())
                 .await
             {
                 Ok(_) => (),
@@ -740,6 +769,7 @@ mod tests
     use crate::codegen::CodeFinder;
     use crate::config::Context;
     use crate::parser;
+    use crate::parser::LogRefKind;
 
     struct TestRefProcCount {}
 
@@ -779,18 +809,20 @@ mod tests
         }
     }
 
-    fn create_test_context(source_dir: &String, check_mode: bool) -> Context
+    fn create_test_context(source_dir: &String, check_mode: bool, structured_mode: bool)
+        -> Context
     {
         let context = Context::new(
             format!(
                 r#"
 source_dir: {}
 rust:
+  structured: {}
   log_macros:
     - module: test_module
       name: test_macro
 "#,
-                source_dir
+                source_dir, structured_mode
             )
             .to_string(),
             &source_dir,
@@ -832,13 +864,27 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 1, 1);
-            let entry = parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry = parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -862,22 +908,40 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 1, 1);
-            let entry =
-                parser::LogRefEntry::new(code_pos, Some(1), String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(1),
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry =
-                parser::LogRefEntry::new(code_pos, Some(3), String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(3),
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry =
-                parser::LogRefEntry::new(code_pos, Some(8), String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(8),
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -893,6 +957,50 @@ rust:
     }
 
     #[test_log::test(async_std::test)]
+    async fn test_next_ref_id_only_count_usable()
+    {
+        const TEST_PATH: &str = "test.rs";
+        let test_contents = String::new();
+        let mut test_entries: Vec<parser::LogRefEntry> = Vec::new();
+
+        {
+            let code_pos = parser::CodePosition::new(1, 1, 1);
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::StructuredPreExisting,
+                None,
+                None,
+            );
+            test_entries.push(entry);
+        }
+
+        {
+            let code_pos = parser::CodePosition::new(1, 2, 1);
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
+            test_entries.push(entry);
+        }
+
+        let map_result = NextReferenceIdProcessor::map(
+            &String::from(TEST_PATH),
+            &test_contents,
+            &None,
+            &test_entries,
+        )
+        .await;
+
+        assert_eq!(map_result, Some((0, 1)));
+    }
+
+    #[test_log::test(async_std::test)]
     async fn test_missing_refs_map_count()
     {
         const TEST_PATH: &str = "test.rs";
@@ -901,20 +1009,40 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 1, 1);
-            let entry = parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry =
-                parser::LogRefEntry::new(code_pos, Some(3), String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(3),
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 1);
-            let entry = parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -998,15 +1126,27 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 3);
-            let entry =
-                parser::LogRefEntry::new(code_pos, Some(1), String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(1),
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(4, 5, 6);
-            let entry =
-                parser::LogRefEntry::new(code_pos, Some(2), String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(2),
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -1031,14 +1171,66 @@ rust:
 
         {
             let code_pos = parser::CodePosition::new(1, 2, 3);
-            let entry =
-                parser::LogRefEntry::new(code_pos, Some(1), String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(1),
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(4, 5, 6);
-            let entry = parser::LogRefEntry::new(code_pos, None, String::from_str("test").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
+            test_entries.push(entry);
+        }
+
+        {
+            let code_pos = parser::CodePosition::new(7, 8, 9);
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::StructuredPreExisting,
+                None,
+                None,
+            );
+            test_entries.push(entry);
+        }
+
+        {
+            let code_pos = parser::CodePosition::new(10, 11, 12);
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test").unwrap(),
+                LogRefKind::StructuredNew,
+                None,
+                None,
+            );
+            test_entries.push(entry);
+        }
+
+        {
+            let code_pos = parser::CodePosition::new(13, 14, 15);
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                Some(2),
+                String::from_str("test").unwrap(),
+                LogRefKind::StructuredPreExisting,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -1050,12 +1242,23 @@ rust:
         )
         .await;
 
-        assert_eq!(map_result, Some(1));
+        assert_eq!(map_result, Some(2));
 
         logs_assert(|lines: &[&str]| {
             match lines
                 .iter()
                 .filter(|line| line.contains("missing_reference_5_6"))
+                .count()
+            {
+                1 => Ok(()),
+                n => Err(format!("More than 1 matching event: {}", n)),
+            }
+        });
+
+        logs_assert(|lines: &[&str]| {
+            match lines
+                .iter()
+                .filter(|line| line.contains("unusable_reference_8_9"))
                 .count()
             {
                 1 => Ok(()),
@@ -1069,7 +1272,7 @@ rust:
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         {
             let source_file_path = temp_dir
@@ -1112,7 +1315,7 @@ rust:
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         {
             let source_file_path = temp_dir
@@ -1171,7 +1374,7 @@ fn test2() {
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         {
             let source_file_path = temp_dir
@@ -1230,7 +1433,7 @@ fn test2() {
 
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         {
             let source_file_path = temp_dir
@@ -1293,7 +1496,7 @@ fn test2() {
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         {
             let source_file_path = temp_dir
@@ -1355,7 +1558,7 @@ fn test2() {
 
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         let test_finder = CodeFinder::new(&test_context).unwrap();
 
@@ -1394,8 +1597,14 @@ fn test2() {
 
         {
             let code_pos = parser::CodePosition::new(30, 2, 18);
-            let entry =
-                parser::LogRefEntry::new(code_pos, None, String::from_str("test_macro").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test_macro").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -1443,15 +1652,27 @@ fn test1() {
 
         {
             let code_pos = parser::CodePosition::new(30, 2, 18);
-            let entry =
-                parser::LogRefEntry::new(code_pos, None, String::from_str("test_macro").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test_macro").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
         {
             let code_pos = parser::CodePosition::new(29, 2, 17);
-            let entry =
-                parser::LogRefEntry::new(code_pos, None, String::from_str("test_macro").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test_macro").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -1547,8 +1768,14 @@ fn test1() {
 
         {
             let code_pos = parser::CodePosition::new(30, 2, 18);
-            let entry =
-                parser::LogRefEntry::new(code_pos, None, String::from_str("test_macro").unwrap());
+            let entry = parser::LogRefEntry::new(
+                code_pos,
+                None,
+                String::from_str("test_macro").unwrap(),
+                LogRefKind::String,
+                None,
+                None,
+            );
             test_entries.push(entry);
         }
 
@@ -1641,7 +1868,7 @@ fn test1() {
 
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         let source_file_path_1 = temp_dir
             .path()
@@ -1786,7 +2013,7 @@ fn test1() {
 
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         let source_file_path_1 = temp_dir
             .path()
@@ -1842,6 +2069,151 @@ fn test1() {
         assert_eq!(insert_result.num_inserted_references, 0);
     }
 
+    #[test]
+    fn test_process_insert_references_structured_files()
+    {
+        use std::sync::atomic::AtomicU32;
+        use std::sync::Arc;
+
+        let temp_dir = TempDir::new("breadlog_test").unwrap();
+        let test_context =
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, true);
+
+        let source_file_path_1 = temp_dir
+            .path()
+            .join("test_file1.rs")
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        {
+            let mut source_file = File::create(&source_file_path_1).unwrap();
+            source_file
+                .write_all(
+                    br#"
+    fn test1_1() {
+        test_macro!("Log test 1_1.");
+    }
+
+    fn test1_2() {
+        test_macro!("Log test 1_2.");
+    }"#,
+                )
+                .unwrap();
+        }
+
+        let source_file_path_2 = temp_dir
+            .path()
+            .join("test_file2.rs")
+            .to_str()
+            .unwrap()
+            .to_string();
+
+        {
+            let mut source_file = File::create(&source_file_path_2).unwrap();
+            source_file
+                .write_all(
+                    br#"
+    fn test2_1() {
+        test_macro!("Log test 2_1.");
+    }
+
+    fn test2_2() {
+        test_macro!("Log test 2_2.");
+    }"#,
+                )
+                .unwrap();
+        }
+
+        let test_finder = CodeFinder::new(&test_context).unwrap();
+
+        let ref_value = AtomicU32::new(2);
+        let ref_arc = Arc::<AtomicU32>::new(ref_value);
+
+        let insert_result = process_references::<
+            InsertReferencesProcessor,
+            Arc<AtomicU32>,
+            InsertReferencesResult,
+            InsertReferencesResult,
+        >(&test_context, Some(ref_arc), &test_finder)
+        .unwrap();
+
+        /* Load the source files after they have finished being processed. Note that we can't reuse the file objects from
+         * earlier because the descriptors will no longer be valid due to the rename operation performed by the processor.
+         */
+        let mut source_file_1 = File::open(&source_file_path_1).unwrap();
+        let mut post_file_contents_1 = String::new();
+        source_file_1
+            .read_to_string(&mut post_file_contents_1)
+            .unwrap();
+
+        let mut source_file_2 = File::open(&source_file_path_2).unwrap();
+        let mut post_file_contents_2 = String::new();
+        source_file_2
+            .read_to_string(&mut post_file_contents_2)
+            .unwrap();
+
+        assert_eq!(insert_result.failure, false);
+        assert_eq!(insert_result.num_inserted_references, 4);
+
+        /* The order in which files are processed is not deterministic, so we need to check for both possible results.
+         */
+
+        assert!(
+            (post_file_contents_1
+                == String::from_str(
+                    r#"
+    fn test1_1() {
+        test_macro!(ref = 4; "Log test 1_1.");
+    }
+
+    fn test1_2() {
+        test_macro!(ref = 5; "Log test 1_2.");
+    }"#
+                )
+                .unwrap())
+                || (post_file_contents_1
+                    == String::from_str(
+                        r#"
+    fn test1_1() {
+        test_macro!(ref = 2; "Log test 1_1.");
+    }
+
+    fn test1_2() {
+        test_macro!(ref = 3; "Log test 1_2.");
+    }"#
+                    )
+                    .unwrap())
+        );
+
+        assert!(
+            (post_file_contents_2
+                == String::from_str(
+                    r#"
+    fn test2_1() {
+        test_macro!(ref = 4; "Log test 2_1.");
+    }
+
+    fn test2_2() {
+        test_macro!(ref = 5; "Log test 2_2.");
+    }"#
+                )
+                .unwrap())
+                || (post_file_contents_2
+                    == String::from_str(
+                        r#"
+    fn test2_1() {
+        test_macro!(ref = 2; "Log test 2_1.");
+    }
+
+    fn test2_2() {
+        test_macro!(ref = 3; "Log test 2_2.");
+    }"#
+                    )
+                    .unwrap())
+        );
+    }
+
     #[test_log::test(async_std::test)]
     async fn test_create_async_temp_file()
     {
@@ -1879,7 +2251,7 @@ fn test1() {
     {
         let temp_dir = TempDir::new("breadlog_test").unwrap();
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         let source_file_path_1: String;
         let source_file_path_2: String;
@@ -1975,7 +2347,7 @@ next_reference_id: 123
         }
 
         let test_context =
-            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false);
+            create_test_context(&temp_dir.path().to_str().unwrap().to_string(), false, false);
 
         let source_file_path_1: String;
         let source_file_path_2: String;
