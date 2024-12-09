@@ -1,12 +1,11 @@
 Configuration
 =============
 
-Breadlog requires a single YAML configuration file for each code base it is 
-used with. This file should be committed to the corresponding source code 
-repository.
+Breadlog requires a single YAML configuration file for each code base using it. 
+This file should be committed to the corresponding source code repository.
 
-See the example Breadlog configuration below for a description of the different
-configuration options.
+See the example Breadlog configuration below for a description of the different 
+options.
 
 .. code-block:: yaml
 

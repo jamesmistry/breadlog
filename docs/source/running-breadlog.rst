@@ -7,16 +7,17 @@ Breadlog modes
 Breadlog is invoked in one of two modes:
 
 1. **Check mode:** Check mode guarantees that Breadlog will not modify your 
-   code, but instead report on the modifications it *would* have made if it 
-   was able to modify your code.
-2. **Code generation mode:** Code generation mode will modify your code, 
-   inserting references in log messages where they are found to be missing.
+   code. Instead it will report on log statements that have missing references.
+   Use check mode by specifying the ``--check`` flag.
+2. **Edit mode:** Edit mode will modify your code, inserting references in log 
+   messages where they are found to be missing. Edit mode is the default mode
+   (when the ``--check`` flag is not specified).
 
 Suggested workflow
 ------------------
 
 1. Make changes to your code.
-2. Run Breadlog in code generation mode.
+2. Run Breadlog in edit mode.
 3. Commit the changes you and Breadlog have made.
 4. Before releasing/pushing changes, run Breadlog in check mode to confirm
    there are no missing log references.
@@ -29,7 +30,7 @@ tool like
 Running from within CI
 ----------------------
 
-It is good practice to run Breadlog in check mode within your continuous 
+It's good practice to run Breadlog in check mode within your continuous 
 integration (CI) pipeline so that you can prevent log statements with missing
 references from making their way into production.
 

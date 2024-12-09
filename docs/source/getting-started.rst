@@ -66,19 +66,19 @@ message text.
 Step 3: Running Breadlog for the first time
 -------------------------------------------
 
-It's good practice to run Breadlog in check mode before allowing it to modify 
-your code. Check mode guarantees that Breadlog will not modify your code, but
-instead report on the modifications it *would* have made if it was in code
-generation mode.
+When running Breadlog for the first time, start by running it in check mode.
 
-Check mode can also be used to verify that there are no missing references in
-log statements across your codebase. This is particularly useful in CI 
-pipelines. Breadlog's exit code will be non-zero if it finds missing 
-references in check mode.
+In check mode, Breadlog won't modify your code. Instead it'll just report 
+where there are missing references (numbers uniquely identifying log 
+statements) within your code.
+
+This is also useful in CI pipelines, allowing you to fail a build if someone 
+has forgotten to use Breadlog before pushing changes. Breadlog's exit code 
+will be non-zero if it finds missing references in check mode.
 
 *All commands below are to be run from the repository root.*
 
-1. Run Breadlog in check mode:
+1. Run Breadlog in check mode using the ``--check`` flag:
 
    .. code-block:: bash
 
@@ -104,16 +104,15 @@ references in check mode.
       2023-11-21T10:34:34.987Z ERROR [breadlog] [ref: 28] Failed: One or more missing references were found
 
    The locations Breadlog reports missing references are where it will insert 
-   references when run in code generation mode (when you omit the ``--check`` 
-   flag).
+   references when run in edit mode (when you omit the ``--check`` flag).
 
    If you'd like Breadlog to ignore a particular log statement, add a comment 
    to the line before the statement with the text ``breadlog:ignore``. For
    more details, see :doc:`directives`.
 
-2. Once you're happy with the output, you can run Breadlog in code generation
-   mode (without the ``--check`` flag). This will modify your code, inserting 
-   references in log messages where they are found to be missing:
+2. Once you're happy with the output, you can run Breadlog in edit mode 
+   (without the ``--check`` flag). This will modify your code, inserting 
+   references in log statements where they are found to be missing:
 
    .. code-block:: bash
 

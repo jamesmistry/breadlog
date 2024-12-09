@@ -11,7 +11,19 @@ code.
 
 This helps you identify application events from log messages using a numerical 
 ID that stays the same even when log message content changes. No brittle or 
-complex text parsing required.
+complex text parsing required, and no new runtime dependencies needed.
+
+A log statement before Breadlog:
+
+```
+warn!("Bad incoming HTTP request");
+```
+
+A log statement after Breadlog:
+
+```
+warn!("[ref: 24] Bad incoming HTTP request");
+```
 
 ## Installing/Upgrading Breadlog
 

@@ -6,7 +6,7 @@ Contributions are welcome, whether they are:
 - Submitting a fix
 - Proposing new features
 
-## Development with Github
+## Development with GitHub
 GitHub is used to host code, track issues and feature requests, as well as accept pull requests.
 
 ## Contributing Changes

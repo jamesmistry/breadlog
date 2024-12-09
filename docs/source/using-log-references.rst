@@ -4,6 +4,9 @@ Using Log References
 Extracting references from log messages
 ---------------------------------------
 
+If you're using structured logging, log references are contained in the ``ref``
+field of the structured message.
+
 If you're not using structured logging, you'll need to extract references
 from log message text through configuration of a log ingestion tool
 (such as `Vector <https://vector.dev/guides/level-up/transformation/>`_).
@@ -109,6 +112,10 @@ this:
 
    2023-05-02T21:50:19.963Z INFO [ref: 24] Bad incoming HTTP request.
 
+(Or, if using structured logging, the ``ref`` value would be exposed as a 
+structured field. This could be serialised as JSON or another structured 
+format).
+
 Our query to count these events is instead:
 
 .. code-block:: sql
@@ -121,7 +128,7 @@ After being updated, the log message looks like this:
 
    2023-05-02T21:50:19.963Z INFO [ref: 24] Bad incoming GET HTTP request.
 
-Note how the numerical reference doesn't change. This means the query we 
+Notice how the numerical reference doesn't change? This means the query we 
 used to analyse the logs still works after the change to the log message.
 
 Also, the query works regardless of the interpolated content and without us 
