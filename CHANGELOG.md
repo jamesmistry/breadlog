@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.6.0](https://github.com/jamesmistry/breadlog/compare/v0.5.0...v0.6.0) (2024-12-10)
+
+
+### Features
+
+* Store log references in structured fields ([74c50ae](https://github.com/jamesmistry/breadlog/commit/74c50ae2baf1ea95429c74b4f4d6ccb6f32d00e5))
+
+
+### Bug Fixes
+
+* Improve documentation clarity ([482d4d4](https://github.com/jamesmistry/breadlog/commit/482d4d423067c6a11e949c3bc615d4fca799a81b))
+
 ## [0.5.0](https://github.com/jamesmistry/breadlog/compare/v0.4.0...v0.5.0) (2024-09-19)
 
 
