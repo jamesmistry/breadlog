@@ -16,13 +16,13 @@ complex text parsing required, and no new runtime dependencies needed.
 A log statement before Breadlog:
 
 ```
-warn!("Bad incoming HTTP request");
+warn!("Bad incoming request: {}", uri);
 ```
 
 A log statement after Breadlog:
 
 ```
-warn!("[ref: 24] Bad incoming HTTP request");
+warn!("[ref: 24] Bad incoming request: {}", uri);
 ```
 
 ## Installing/Upgrading Breadlog
